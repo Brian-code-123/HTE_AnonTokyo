@@ -35,10 +35,23 @@ from __future__ import annotations
 import logging
 import math
 
-import librosa
-import numpy as np
-
 logger = logging.getLogger(__name__)
+
+# librosa / numpy are optional heavy dependencies (not available on Vercel).
+# We import them lazily inside the functions that need them so the rest of
+# the application can start and operate without them.
+try:
+    import librosa  # type: ignore
+    import numpy as np  # type: ignore
+    _LIBROSA_AVAILABLE = True
+except ImportError:
+    librosa = None  # type: ignore
+    np = None  # type: ignore
+    _LIBROSA_AVAILABLE = False
+    logger.warning(
+        "librosa/numpy not available — voice fluctuation analysis disabled. "
+        "Install them locally if you need this feature."
+    )
 
 # Human speech typically falls in the 65-600 Hz range.
 _FMIN = 65.0
@@ -131,7 +144,12 @@ def calculate_fluctuation_timeline(
     -------
     List of dicts with keys ``timestamp_start``, ``timestamp_end``, and
     ``fluctuation_score`` (0-100 normalised).
+    Returns an empty list when librosa is not installed.
     """
+    if not _LIBROSA_AVAILABLE:
+        logger.warning("Skipping voice fluctuation analysis — librosa not installed.")
+        return []
+
     y, sr = librosa.load(wav_path, sr=sr, mono=True)
     total_samples = len(y)
     window_samples = window_sec * sr

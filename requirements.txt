@@ -2,8 +2,10 @@ fastapi
 uvicorn[standard]
 python-multipart
 ffmpeg-python
-librosa
-numpy
+# librosa and numpy are optional heavy dependencies for voice fluctuation
+# analysis. They are NOT installed on Vercel (disk space constraints).
+# Install locally if you need the FluctuationChart feature:
+#   pip install librosa numpy
 boto3
 pydantic-settings
 python-dotenv
