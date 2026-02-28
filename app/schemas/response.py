@@ -131,3 +131,51 @@ class FeedbackResponse(BaseModel):
     status: str = "success"
     feedback: str
     model: str
+
+
+# ── MiniMax TTS + Video ─────────────────────────────────────────────────────
+class TTSGenerateRequest(BaseModel):
+    text: str
+    voice_id: str = "male-qn-qingse"
+    speed: float = 1.0
+    emotion: str = "neutral"
+    language_boost: str = "auto"
+
+
+class TTSGenerateResponse(BaseModel):
+    audio_url: str
+    duration_ms: int
+    sample_rate: int
+    word_count: int
+    format: str
+
+
+class TTSVoice(BaseModel):
+    id: str
+    name: str
+    lang: str
+
+
+class TTSVoicesResponse(BaseModel):
+    voices: list[TTSVoice]
+    emotions: list[str]
+
+
+class VideoGenerateRequest(BaseModel):
+    prompt: str
+    duration: int = 6
+    resolution: str = "768P"
+    model: str = "T2V-01"
+
+
+class VideoGenerateResponse(BaseModel):
+    task_id: str
+
+
+class VideoStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    file_id: str | None = None
+    video_width: int | None = None
+    video_height: int | None = None
+    download_url: str | None = None
