@@ -22,6 +22,7 @@ Configure these secrets in your repository: **Settings → Secrets and variables
 | Secret | Description |
 |--------|-------------|
 | `CLOUDFRONT_DISTRIBUTION_ID` | CloudFront distribution ID — enables cache invalidation after deploy |
+| `S3_UPLOAD_BUCKET` | S3 bucket name for large file uploads. When set, files > 5 MB are uploaded directly to S3 (avoids Lambda 6 MB limit). **Lambda execution role must have `s3:PutObject` and `s3:GetObject` on this bucket.** |
 
 ---
 

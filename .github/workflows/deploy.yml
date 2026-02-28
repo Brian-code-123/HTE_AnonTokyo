@@ -71,11 +71,16 @@ jobs:
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
+          S3_UPLOAD_BUCKET: ${{ secrets.S3_UPLOAD_BUCKET }}
         run: |
+          ENV_VARS="ELEVENLABS_API_KEY=$ELEVENLABS_API_KEY,GEMINI_API_KEY=$GEMINI_API_KEY,MINIMAX_API_KEY=$MINIMAX_API_KEY,MAX_UPLOAD_BYTES=524288000"
+          if [ -n "${S3_UPLOAD_BUCKET}" ]; then
+            ENV_VARS="${ENV_VARS},S3_UPLOAD_BUCKET=${S3_UPLOAD_BUCKET}"
+          fi
           aws lambda update-function-configuration \
             --function-name "$LAMBDA_FUNCTION_NAME" \
             --region "$AWS_REGION" \
-            --environment "Variables={ELEVENLABS_API_KEY=$ELEVENLABS_API_KEY,GEMINI_API_KEY=$GEMINI_API_KEY,MINIMAX_API_KEY=$MINIMAX_API_KEY,MAX_UPLOAD_BYTES=524288000}" \
+            --environment "Variables={$ENV_VARS}" \
             --output json > /dev/null
 
       - name: Invalidate CloudFront cache (if configured)

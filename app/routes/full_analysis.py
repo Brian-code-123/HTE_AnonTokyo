@@ -15,9 +15,10 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
+from app.services.s3_upload import download_from_s3
 from app.schemas.response import (
     BodyLanguageSegmentReport,
     BodyLanguageSummary,
@@ -103,49 +104,65 @@ def _build_body_language_summary(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  POST /api/full-analysis  — file upload
+#  POST /api/full-analysis  — file upload or S3 key (for large files)
 # ─────────────────────────────────────────────────────────────────────────────
 @router.post("/api/full-analysis", response_model=FullAnalysisResponse)
 async def full_analysis_file(
-    file: UploadFile,
-    use_placeholder: bool = True,
-    language: str = "auto",
-    model: str = "gemini-3.1-pro-preview",
-    segment_duration: int = 180,
+    use_placeholder: bool = Form(True),
+    language: str = Form("auto"),
+    model: str = Form("gemini-3.1-pro-preview"),
+    segment_duration: int = Form(180),
+    file: UploadFile | None = File(None),
+    s3_key: str | None = Form(None),
+    filename: str | None = Form(None),
 ) -> FullAnalysisResponse:
-    """Upload a video/audio file and get the full analysis pipeline.
+    """Full analysis pipeline. Send either a multipart file or s3_key (after uploading via /api/upload-url).
 
     When use_placeholder=True (default), returns pre-analyzed Mark John data.
-    When use_placeholder=False, runs the live pipeline: transcription →
-    body language (Gemini) → rubric evaluation (Gemini).
+    When use_placeholder=False, runs the live pipeline.
     """
     settings = get_settings()
     job_id = uuid.uuid4().hex
 
+    if (file is None) == (s3_key is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either a file upload or s3_key (from /api/upload-url), not both and not neither.",
+        )
+
     if use_placeholder:
         body_language = load_placeholder_body_language()
         session_stats.full_analyses += 1
+        display_name = (file.filename if file else filename) or (s3_key or "upload")
         return FullAnalysisResponse(
             job_id=job_id,
-            video_source=file.filename or "upload",
+            video_source=display_name,
             is_placeholder=True,
             transcript=None,
             body_language=body_language,
             rubric_evaluation=PLACEHOLDER_RUBRIC_EVALUATION,
         )
 
-    # ── Live analysis pipeline ────────────────────────────────────────────
+    # ── Resolve input path: from file or from S3 ─────────────────────────────
+    if s3_key:
+        ext = Path(s3_key).suffix.lower() or ".bin"
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{ext}' from S3 key. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            )
+        display_name = filename or s3_key.split("/")[-1] or "upload"
+    else:
+        display_name = file.filename or "upload"
+        ext = Path(display_name).suffix.lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            )
+
     api_key = settings.gemini_api_key
     use_gemini = bool(api_key)
-
-    filename = file.filename or "upload"
-    ext = Path(filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported file type '{ext}'. "
-                   f"Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-        )
 
     tmp_dir = Path(settings.temp_dir) / f"fa_{job_id}"
     tmp_dir.mkdir(parents=True, exist_ok=True)
@@ -155,14 +172,20 @@ async def full_analysis_file(
     wav_path = str(tmp_dir / "audio.wav")
 
     try:
-        contents = await file.read()
-        if len(contents) > settings.max_upload_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File exceeds the {settings.max_upload_bytes // (1024 * 1024)} MB limit.",
-            )
-        Path(raw_path).write_bytes(contents)
-        logger.info("[%s] Saved upload: %s (%.1f MB)", job_id, filename, len(contents) / 1e6)
+        if s3_key:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, download_from_s3, settings, s3_key, raw_path)
+            size_mb = Path(raw_path).stat().st_size / 1e6
+            logger.info("[%s] Downloaded from S3: %s (%.1f MB)", job_id, s3_key, size_mb)
+        else:
+            contents = await file.read()
+            if len(contents) > settings.max_upload_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds the {settings.max_upload_bytes // (1024 * 1024)} MB limit.",
+                )
+            Path(raw_path).write_bytes(contents)
+            logger.info("[%s] Saved upload: %s (%.1f MB)", job_id, display_name, len(contents) / 1e6)
 
         loop = asyncio.get_running_loop()
 
@@ -235,7 +258,7 @@ async def full_analysis_file(
         session_stats.full_analyses += 1
         return FullAnalysisResponse(
             job_id=job_id,
-            video_source=filename,
+            video_source=display_name,
             is_placeholder=False,
             transcript=transcript_result,
             body_language=body_language,

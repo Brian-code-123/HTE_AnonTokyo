@@ -17,6 +17,9 @@ const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
 })
 
+/** Files larger than this use S3 presigned upload (Lambda has 6 MB request limit). */
+const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024
+
 /**
  * Extract a readable error message from API response
  * Handles various error formats to provide consistent user feedback
@@ -28,6 +31,29 @@ function extractError(err: unknown): string {
   }
   if (err instanceof Error) return err.message
   return 'Unknown error'
+}
+
+/** Get presigned PUT URL for direct S3 upload (for large files). */
+export async function getUploadUrl(filename: string): Promise<{ upload_url: string; s3_key: string }> {
+  const { data } = await api.get<{ upload_url: string; s3_key: string }>('/upload-url', {
+    params: { filename },
+  })
+  return data
+}
+
+/** Upload file to S3 via presigned URL. */
+export async function uploadToS3(
+  uploadUrl: string,
+  file: File,
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  await axios.put(uploadUrl, file, {
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    timeout: 60 * 60 * 1000,
+    onUploadProgress: evt => {
+      if (evt.total) onProgress?.(Math.round((evt.loaded / evt.total) * 100))
+    },
+  })
 }
 
 /** Options for file-based transcription */
@@ -49,21 +75,32 @@ export interface TranscribeYoutubeOptions {
 }
 
 /**
- * Transcribe an uploaded audio/video file
- * - Sends file as multipart form data
- * - Reports upload progress via callback
- * - Timeout: 10 minutes for long files
+ * Transcribe an uploaded audio/video file.
+ * Files > 5 MB upload via S3 presigned URL to avoid Lambda 6 MB limit.
  */
 export async function transcribeFile({
   file,
   language,
   onProgress,
 }: TranscribeFileOptions): Promise<TranscriptResult> {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('language', language)
-
   try {
+    if (file.size > LARGE_FILE_THRESHOLD) {
+      const { upload_url, s3_key } = await getUploadUrl(file.name)
+      onProgress?.(5)
+      await uploadToS3(upload_url, file, pct => onProgress?.(5 + Math.round(pct * 0.35)))
+      onProgress?.(45)
+      const form = new FormData()
+      form.append('s3_key', s3_key)
+      form.append('filename', file.name)
+      form.append('language', language)
+      const { data } = await api.post<TranscriptResult>('/analyze', form, {
+        timeout: 10 * 60 * 1000,
+      })
+      return data
+    }
+    const form = new FormData()
+    form.append('file', file)
+    form.append('language', language)
     const { data } = await api.post<TranscriptResult>('/analyze', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 10 * 60 * 1000,
@@ -108,12 +145,26 @@ export async function fullAnalysisFile({
   usePlaceholder,
   onProgress,
 }: FullAnalysisFileOptions): Promise<FullAnalysisResult> {
-  const form = new FormData()
-  form.append('file', file)
-  form.append('language', language)
-  form.append('use_placeholder', String(usePlaceholder))
-
   try {
+    if (file.size > LARGE_FILE_THRESHOLD) {
+      const { upload_url, s3_key } = await getUploadUrl(file.name)
+      onProgress?.(5)
+      await uploadToS3(upload_url, file, pct => onProgress?.(5 + Math.round(pct * 0.4)))
+      onProgress?.(45)
+      const form = new FormData()
+      form.append('s3_key', s3_key)
+      form.append('filename', file.name)
+      form.append('language', language)
+      form.append('use_placeholder', String(usePlaceholder))
+      const { data } = await api.post<FullAnalysisResult>('/full-analysis', form, {
+        timeout: 30 * 60 * 1000,
+      })
+      return data
+    }
+    const form = new FormData()
+    form.append('file', file)
+    form.append('language', language)
+    form.append('use_placeholder', String(usePlaceholder))
     const { data } = await api.post<FullAnalysisResult>('/full-analysis', form, {
       headers: { 'Content-Type': 'multipart/form-data' },
       timeout: 30 * 60 * 1000,

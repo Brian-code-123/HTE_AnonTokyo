@@ -21,9 +21,10 @@ import shutil
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.config import get_settings
+from app.services.s3_upload import download_from_s3
 from app.schemas.response import (
     AnalysisResponse,
     BodyLanguageRequest,
@@ -76,24 +77,35 @@ def _build_response(ws_result, job_id: str) -> TranscriptResult:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  POST /api/analyze  — file upload
+#  POST /api/analyze  — file upload or S3 key (for large files)
 # ─────────────────────────────────────────────────────────────────────────────
 @router.post("/api/analyze", response_model=TranscriptResult)
 async def analyze_file(
-    file: UploadFile,
-    language: str = "auto",
+    language: str = Form("auto"),
+    file: UploadFile | None = File(None),
+    s3_key: str | None = Form(None),
+    filename: str | None = Form(None),
 ) -> TranscriptResult:
-    """Accept a video/audio upload and return a full transcript with timestamps."""
+    """Accept a video/audio upload or S3 key and return a full transcript."""
     settings = get_settings()
 
-    # ── Validate filename ──────────────────────────────────────────────────
-    filename = file.filename or "upload"
-    ext = Path(filename).suffix.lower()
+    if (file is None) == (s3_key is None):
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either a file upload or s3_key (from /api/upload-url), not both and not neither.",
+        )
+
+    if s3_key:
+        ext = Path(s3_key).suffix.lower() or ".bin"
+        display_name = filename or s3_key.split("/")[-1] or "upload"
+    else:
+        display_name = file.filename or "upload"
+        ext = Path(display_name).suffix.lower()
+
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type '{ext}'. "
-                   f"Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
         )
 
     job_id = uuid.uuid4().hex
@@ -104,15 +116,19 @@ async def analyze_file(
     wav_path = str(tmp_dir / "audio.wav")
 
     try:
-        # ── Save upload ────────────────────────────────────────────────────
-        contents = await file.read()
-        if len(contents) > settings.max_upload_bytes:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File exceeds the {settings.max_upload_bytes // (1024*1024)} MB limit.",
-            )
-        Path(raw_path).write_bytes(contents)
-        logger.info("[%s] Saved upload: %s (%.1f MB)", job_id, filename, len(contents) / 1e6)
+        if s3_key:
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(None, download_from_s3, settings, s3_key, raw_path)
+            logger.info("[%s] Downloaded from S3: %s", job_id, s3_key)
+        else:
+            contents = await file.read()
+            if len(contents) > settings.max_upload_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"File exceeds the {settings.max_upload_bytes // (1024*1024)} MB limit.",
+                )
+            Path(raw_path).write_bytes(contents)
+            logger.info("[%s] Saved upload: %s (%.1f MB)", job_id, display_name, len(contents) / 1e6)
 
         # ── Extract audio (if video) ───────────────────────────────────────
         if ext in {".wav", ".mp3", ".m4a", ".ogg", ".flac"}:

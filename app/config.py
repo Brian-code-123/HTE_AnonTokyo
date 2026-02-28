@@ -24,6 +24,12 @@ class Settings(BaseSettings):
     minimax_model: str = "MiniMax-M2.5"
     minimax_base_url: str = "https://api.minimax.io/anthropic"
 
+    # ── AWS (S3 presigned uploads for large files; Lambda has 6 MB limit) ─
+    aws_region: str = "us-east-1"
+    aws_access_key_id: str = ""
+    aws_secret_access_key: str = ""
+    s3_upload_bucket: str = ""
+
     # ── Misc ────────────────────────────────────────────────────────────
     fluctuation_window_seconds: int = 180
     temp_dir: str = tempfile.gettempdir()

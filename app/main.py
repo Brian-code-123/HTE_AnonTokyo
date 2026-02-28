@@ -10,6 +10,7 @@ from app.routes.dashboard import router as dashboard_router
 from app.routes.feedback import router as feedback_router
 from app.routes.full_analysis import router as full_analysis_router
 from app.routes.media import router as media_router
+from app.routes.upload import router as upload_router
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     )
 
     application.include_router(dashboard_router)
+    application.include_router(upload_router)
     application.include_router(analyze_router)
     application.include_router(full_analysis_router)
     application.include_router(feedback_router)
