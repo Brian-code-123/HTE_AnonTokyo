@@ -83,6 +83,8 @@ jobs:
           S3_UPLOAD_BUCKET: ${{ secrets.S3_UPLOAD_BUCKET }}
           S3_UPLOAD_REGION: ${{ secrets.S3_UPLOAD_REGION }}
           S3_UPLOAD_PREFIX: ${{ secrets.S3_UPLOAD_PREFIX }}
+          DDB_TABLE_NAME: ${{ secrets.DDB_TABLE_NAME }}
+          DDB_REGION: ${{ secrets.DDB_REGION }}
         run: |
           ENV_VARS="ELEVENLABS_API_KEY=$ELEVENLABS_API_KEY,GEMINI_API_KEY=$GEMINI_API_KEY,MINIMAX_API_KEY=$MINIMAX_API_KEY,MAX_UPLOAD_BYTES=524288000"
           if [ -n "${S3_UPLOAD_BUCKET}" ]; then
@@ -93,6 +95,12 @@ jobs:
           fi
           if [ -n "${S3_UPLOAD_PREFIX}" ]; then
             ENV_VARS="${ENV_VARS},S3_UPLOAD_PREFIX=${S3_UPLOAD_PREFIX}"
+          fi
+          if [ -n "${DDB_TABLE_NAME}" ]; then
+            ENV_VARS="${ENV_VARS},DYNAMODB_TABLE_NAME=${DDB_TABLE_NAME}"
+          fi
+          if [ -n "${DDB_REGION}" ]; then
+            ENV_VARS="${ENV_VARS},DYNAMODB_REGION=${DDB_REGION}"
           fi
           aws lambda update-function-configuration \
             --function-name "$LAMBDA_FUNCTION_NAME" \
@@ -107,7 +115,7 @@ jobs:
           if [ -n "${CLOUDFRONT_DISTRIBUTION_ID}" ]; then
             aws cloudfront create-invalidation \
               --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" \
-              --paths "/*"
+              --paths "/*" || echo "CloudFront invalidation failed; continuing."
           else
             echo "CLOUDFRONT_DISTRIBUTION_ID not set; skipping invalidation."
           fi
