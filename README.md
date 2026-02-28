@@ -20,39 +20,215 @@ VoiceTrace is a comprehensive **AI-driven teaching evaluation platform** that he
 
 ## 🚀 Features
 
-### 1. **Smart Transcription**
-- Real-time audio-to-text with timestamps
-- Multi-language support (English, Mandarin, Japanese, etc.)
-- Segment-based breakdown for easy navigation
+### Core Analysis Features
+1. **Smart Transcription**
+   - Real-time audio-to-text with timestamps
+   - Multi-language support (English, Mandarin, Japanese, etc.)
+   - Segment-based breakdown for easy navigation
 
-### 2. **Body Language Assessment**
-- Detects posture, gestures, facial expressions
-- Analyzes engagement and classroom presence
-- Provides confidence and clarity metrics
+2. **Body Language Assessment**
+   - Detects posture, gestures, facial expressions
+   - Analyzes engagement and classroom presence
+   - Provides confidence and clarity metrics
 
-### 3. **Teaching Evaluation**
-- Rubric-based assessment on:
-  - Teaching clarity
-  - Content depth
-  - Student engagement techniques
-  - Classroom management
-- Scoring against industry-standard benchmarks
+3. **Teaching Evaluation**
+   - Rubric-based assessment on:
+     - Teaching clarity (0-100)
+     - Content depth (0-100)
+     - Student engagement techniques (0-100)
+     - Classroom management (0-100)
+   - Scoring against industry-standard benchmarks
 
-### 4. **AI-Generated Feedback**
-- Contextual recommendations based on recorded teaching
-- Specific, actionable improvement suggestions
-- Links to video segments where improvements are needed
+4. **AI-Generated Feedback**
+   - Contextual recommendations based on recorded teaching
+   - Specific, actionable improvement suggestions
+   - Links to video segments where improvements are needed
 
-### 5. **Voice Analytics**
-- Pitch variation analysis
-- Speaking pace metrics
-- Voice stability score
-- ElevenLabs TTS for report narration
+5. **Voice Analytics**
+   - Pitch variation analysis
+   - Speaking pace metrics
+   - Voice stability score
+   - ElevenLabs TTS for report narration
 
-### 6. **Video Generation**
-- Auto-generate concept explanation videos
-- Supports multiple styles and durations
-- Powered by MiniMax v1
+6. **Video Generation**
+   - Auto-generate concept explanation videos
+   - Supports multiple styles and durations
+   - Powered by MiniMax v1
+
+### Phase 12: Enhanced Navigation & Coaching System
+*(March 2026 Update)*
+
+7. **Restructured 3-Tab Navigation**
+   - **Dashboard**: Overview of all analyses, trends, metrics comparison
+   - **For You**: Personalized tools and coaching insights
+   - **Feedback**: Detailed feedback history and notes
+
+8. **For You Mega-Menu Dropdown**
+   - Hover-activated dropdown with 3 organized columns:
+     - **ANALYSIS**: Transcribe & Analyse, Compare Analyses
+     - **AI-POWERED**: AI Coaching, Voice Report, Video Generator
+     - **DATA & TRACKING**: Rubric Builder, Teacher Timeline
+   - Smooth 200ms delay for reliable interaction
+   - Click-to-navigate directly to any tool
+
+9. **AI Coaching System** 🆕
+   - Real-time coaching suggestions based on teaching trends
+   - Auto-generates priority-ranked recommendations:
+     - **High Priority**: Score < 60 or negative trend
+     - **Medium Priority**: Score < 75
+     - **Low Priority**: Score ≥ 75 with positive trend
+   - Context-aware action items for each teaching dimension
+   - Integrated with each analysis session
+
+10. **Demo Data Seeding** 🆕
+    - Auto-populate with 3 teachers × 4 analyses each
+    - Demonstrates all visualization components
+    - Sample rubric templates (Standard Teaching, Presentation Skills)
+    - One-click reset via `/api/seed-demo` endpoint
+    - Idempotent design (safe to call multiple times)
+
+11. **Enhanced Rubric Builder** 🆕
+    - Modern glass-morphism card design
+    - **2 Quick Templates**:
+      - Standard Teaching Rubric (5 dimensions)
+      - Presentation Skills Rubric (4 dimensions)
+    - **Full CRUD Operations**:
+      - Create custom rubrics with flexible dimensions
+      - Edit weight per dimension (importance multiplier)
+      - Set max score per dimension (1-10)
+      - Delete rubrics with confirmation
+    - **Improved UI**:
+      - Section-based layout with clearer visual hierarchy
+      - Inline validation & helpful error messages
+      - Success notifications on save
+      - Drag handle placeholders for potential future reordering
+
+12. **Teacher Timeline Tracker** 🆕
+    - Track teaching performance over time
+    - Visualize trends across:
+      - Pace, Body Language, Clarity, Engagement, Overall Score
+    - Filter by teacher
+    - Add new teacher records
+    - Mini charts showing score progression
+
+13. **Expanded Assistant Widget** 🆕
+    - Increased to 440×680px (from 340×520px)
+    - **Clearer guidance structure**:
+      - Welcome message with 3-tab overview
+      - 9 quick-access suggestions:
+        - Transcribe & Analyse
+        - Compare Analyses
+        - Teacher Timeline
+        - AI Coaching
+        - Rubric Builder
+        - Voice Report
+        - Video Generator
+        - And more...
+    - Persistent sidebar presence
+    - Improved accessibility
+
+---
+
+## 🎨 UI/UX Enhancements (Phase 12)
+
+- **Dropdown Mega-Menu**: NeoTrace-inspired design with 3-column layout
+- **Consistent Color Scale**: All scores unified to 0-100 scale
+- **Glass-Morphism Cards**: Modern backdrop-filter effects on elevated containers
+- **Improved Typography**: Better font weights, sizes, and spacing
+- **Hover States**: Smooth transitions on interactive elements
+- **Mobile Responsive**: Dropdown adapts to smaller screens
+
+---
+
+## 🔮 Suggested Future Features
+
+### High Impact (Quick Wins)
+1. **Peer Comparison Dashboard**
+   - Compare your metrics against teacher cohorts
+   - Percentile rankings in subject area
+   - Identify top performers in each dimension
+   - Anonymous benchmarking
+
+2. **Growth Plan Builder**
+   - Auto-generate 4-week/8-week improvement plans
+   - Link recommendations to specific resources
+   - Track progress checkpoints
+   - Integration with calendar/scheduling
+
+3. **Smart Transcript Search**
+   - Full-text search across all transcripts
+   - Highlight key moments (questions, pauses, emotional markers)
+   - Jump to video timestamp directly
+   - Export quotations with context
+
+4. **Annotation & Notes System**
+   - Add notes to specific video seconds
+   - Mark favorite/problematic moments
+   - Create visual notes/drawings on frames
+   - Share notes with colleagues/mentors
+
+### Medium Impact (Enhanced Analytics)
+5. **Detailed Metrics Breakdown**
+   - Word frequency analysis (shows teaching patterns)
+   - Question type distribution (open vs. closed)
+   - Student engagement patterns (when attention drops)
+   - Silence/pause analysis (thinking time)
+
+6. **Comparative Video Analysis**
+   - Side-by-side playback of multiple lessons
+   - Overlay metrics to spot improvements over time
+   - A/B test different techniques
+   - Visual regression detection
+
+7. **Confidence Scoring**
+   - Show confidence level for each metric
+   - Indicate when data is insufficient
+   - Flag anomalies or outliers
+   - Suggest re-recording if needed
+
+8. **Custom Rubric Templates Library**
+   - Community-shared rubric templates
+   - Subject-specific (Math, Science, Language, etc.)
+   - Grade-level variants (Elementary, Middle, High School)
+   - Rating & review system
+
+### Long-Term Enhancements
+9. **Real-Time Classroom Feedback**
+   - Live transcription during teaching
+   - Real-time coaching suggestions on smartwatch/phone
+   - Haptic vibration for critical moments
+   - Post-lesson auto-summary generation
+
+10. **Integration Ecosystem**
+    - Google Classroom sync (auto-import live class videos)
+    - Slack/Teams notifications for coaching alerts
+    - Learning Management System (LMS) connectors
+    - Export to PDF/PowerPoint reports
+
+11. **Multilingual Coaching**
+    - AI feedback in teacher's native language
+    - Localized teaching benchmarks
+    - Cultural adaptation of recommendations
+    - Multi-subtitle support
+
+12. **Advanced Computer Vision**
+    - Emotional state tracking (teacher & students if visible)
+    - Classroom composition analysis (attention levels)
+    - Gesture classification (enthusiasm, clarity signals)
+    - Eye-gaze tracking (where teacher looks)
+
+### Data & Privacy
+13. **Enhanced Data Privacy**
+    - On-device transcription option (no cloud upload)
+    - Selective sharing per colleague
+    - GDPR/CCPA compliance dashboard
+    - Automatic data retention policies
+
+14. **Institutional Analytics**
+    - School/district-level dashboards
+    - Department performance trends
+    - Professional development impact tracking
+    - Budget ROI reporting
 
 ---
 
@@ -364,7 +540,11 @@ Built with:
 ---
 
 **Last Updated**: March 1, 2026  
-**Version**: 1.0.0
+**Current Version**: 1.1.0 (Phase 12 - Enhanced Navigation & Coaching)
+
+**Previous Versions**:
+- v1.0.0: Core transcription, body language, evaluation, feedback
+- v1.1.0: 3-tab navigation, For You mega-menu, AI Coaching, Demo data, improved Rubric Builder
 
 ---
 

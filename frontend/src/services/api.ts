@@ -11,7 +11,7 @@
  * - POST /api/analyze/youtube - YouTube URL transcription
  */
 import axios, { AxiosError } from 'axios'
-import type { TranscriptResult, TTSResult, TTSVoice, VideoGenResult, FullAnalysisResult, FullAnalysisFileOptions, FullAnalysisYoutubeOptions, FeedbackRequest, FeedbackResult, DashboardData, HistoryData } from '../types'
+import type { TranscriptResult, TTSResult, TTSVoice, VideoGenResult, FullAnalysisResult, FullAnalysisFileOptions, FullAnalysisYoutubeOptions, FeedbackRequest, FeedbackResult, DashboardData, HistoryData, Teacher, AnalysisDetail, Rubric, RubricDimension, ShareLink, TeacherTimeline, ComparisonResult, CoachingPlan } from '../types'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -308,6 +308,188 @@ export async function generateVideo(opts: VideoGenOptions): Promise<{ task_id: s
 export async function getVideoStatus(taskId: string): Promise<VideoGenResult> {
   try {
     const { data } = await api.get<VideoGenResult>(`/video/status/${taskId}`)
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Teacher API ──────────────────────────────────────────────────────────
+
+export async function createTeacher(id: string, name: string, subject: string = ''): Promise<Teacher> {
+  try {
+    const { data } = await api.post<Teacher>('/teachers', { id, name, subject })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchTeachers(): Promise<Teacher[]> {
+  try {
+    const { data } = await api.get<Teacher[]>('/teachers')
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchTeacherTimeline(teacherId: string): Promise<TeacherTimeline> {
+  try {
+    const { data } = await api.get<TeacherTimeline>(`/teachers/${teacherId}/timeline`)
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Analysis Storage API ─────────────────────────────────────────────────
+
+export interface SaveAnalysisOpts {
+  analysis_id: string
+  teacher_id: string
+  teacher_name: string
+  lesson_title: string
+  lesson_date: string
+  scores: Record<string, number>
+  payload: Record<string, unknown>
+}
+
+export async function saveAnalysis(opts: SaveAnalysisOpts): Promise<AnalysisDetail> {
+  try {
+    const { data } = await api.post<AnalysisDetail>('/analyses', opts)
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchAnalyses(teacherId?: string): Promise<AnalysisDetail[]> {
+  try {
+    const params: Record<string, string> = {}
+    if (teacherId) params.teacher_id = teacherId
+    const { data } = await api.get<AnalysisDetail[]>('/analyses', { params })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchAnalysis(id: string): Promise<AnalysisDetail> {
+  try {
+    const { data } = await api.get<AnalysisDetail>(`/analyses/${id}`)
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Rubric API ───────────────────────────────────────────────────────────
+
+export interface CreateRubricOpts {
+  name: string
+  dimensions: RubricDimension[]
+  teacher_id?: string | null
+}
+
+export async function createRubric(opts: CreateRubricOpts): Promise<Rubric> {
+  try {
+    const { data } = await api.post<Rubric>('/rubrics', opts)
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchRubrics(teacherId?: string): Promise<Rubric[]> {
+  try {
+    const params: Record<string, string> = {}
+    if (teacherId) params.teacher_id = teacherId
+    const { data } = await api.get<Rubric[]>('/rubrics', { params })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function deleteRubric(rubricId: string): Promise<void> {
+  try {
+    await api.delete(`/rubrics/${rubricId}`)
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Share Link API ───────────────────────────────────────────────────────
+
+export async function createShareLink(analysisId: string, days: number = 30): Promise<ShareLink> {
+  try {
+    const { data } = await api.post<ShareLink>('/shares', { analysis_id: analysisId, days })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Comparison API ───────────────────────────────────────────────────────
+
+export async function compareAnalyses(ids: string[]): Promise<ComparisonResult> {
+  try {
+    const { data } = await api.post<ComparisonResult>('/comparison', { analysis_ids: ids })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── PDF Export API ───────────────────────────────────────────────────────
+
+export async function exportPDF(analysisId: string, opts?: {
+  include_body_language?: boolean
+  include_knowledge_points?: boolean
+  include_transcript?: boolean
+}): Promise<Blob> {
+  try {
+    const { data } = await api.post('/export/pdf', {
+      analysis_id: analysisId,
+      include_body_language: opts?.include_body_language ?? true,
+      include_knowledge_points: opts?.include_knowledge_points ?? true,
+      include_transcript: opts?.include_transcript ?? false,
+    }, {
+      responseType: 'blob',
+      timeout: 30_000,
+    })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── AI Coaching API ──────────────────────────────────────────────────────
+
+export async function fetchCoachingPlan(teacherId: string): Promise<CoachingPlan> {
+  try {
+    const { data } = await api.post<CoachingPlan>('/coaching/suggestions', { teacher_id: teacherId }, {
+      timeout: 30_000,
+    })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+// ── Seed / Demo Data API ─────────────────────────────────────────────────
+
+export interface SeedResult {
+  teachers_created: number
+  analyses_created: number
+  rubrics_created: number
+  message: string
+}
+
+export async function seedDemoData(): Promise<SeedResult> {
+  try {
+    const { data } = await api.post<SeedResult>('/seed-demo')
     return data
   } catch (err) {
     throw new Error(extractError(err))

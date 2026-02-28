@@ -1,6 +1,6 @@
 import {
   Mic, Github, ArrowUp, Lock,
-  LayoutDashboard, FileText, Volume2, Film, MessageSquare,
+  LayoutDashboard, Sparkles, MessageSquare,
 } from 'lucide-react'
 import type { AppTab } from '../types'
 
@@ -51,9 +51,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           <h4 className="footer-col-title">Navigate</h4>
           <ul className="footer-links">
             <li><a href="#" onClick={nav('dashboard')}><LayoutDashboard size={14} /> Dashboard</a></li>
-            <li><a href="#" onClick={nav('transcribe')}><FileText size={14} /> Transcribe</a></li>
-            <li><a href="#" onClick={nav('voice-report')}><Volume2 size={14} /> Voice Report</a></li>
-            <li><a href="#" onClick={nav('video-gen')}><Film size={14} /> Video Generator</a></li>
+            <li><a href="#" onClick={nav('for-you')}><Sparkles size={14} /> For You</a></li>
             <li><a href="#" onClick={nav('feedback')}><MessageSquare size={14} /> Feedback</a></li>
           </ul>
         </div>

@@ -13,8 +13,36 @@ export type InputMode = 'upload' | 'youtube'
 /** Analysis mode: transcription only vs full AI analysis */
 export type AnalysisMode = 'transcribe' | 'full-analysis'
 
-/** Top-level navigation tabs */
-export type AppTab = 'dashboard' | 'transcribe' | 'voice-report' | 'video-gen' | 'feedback'
+/** Top-level navigation tabs (3 tabs only) */
+export type AppTab = 'dashboard' | 'for-you' | 'feedback'
+
+/** Sub-tool identifiers available under the "For You" page */
+export type ForYouTool =
+  | 'transcribe'
+  | 'voice-report'
+  | 'video-gen'
+  | 'rubrics'
+  | 'timeline'
+  | 'compare'
+  | 'coaching'
+
+/** Coaching suggestion from AI based on trend data */
+export interface CoachingSuggestion {
+  area: string
+  current_score: number
+  trend: number
+  priority: 'high' | 'medium' | 'low'
+  suggestion: string
+  action_items: string[]
+}
+
+/** Coaching plan response from backend */
+export interface CoachingPlan {
+  teacher_name: string
+  generated_at: string
+  overall_summary: string
+  suggestions: CoachingSuggestion[]
+}
 
 /** Transcription job lifecycle states */
 export type JobStatus =
@@ -230,4 +258,103 @@ export interface FeedbackResult {
   status: string
   feedback: string
   model: string
+}
+
+// ── Teacher Types ────────────────────────────────────────────────────────
+
+export interface Teacher {
+  id: string
+  name: string
+  subject: string
+  created_at: string
+}
+
+// ── Analysis Storage Types ───────────────────────────────────────────────
+
+export interface AnalysisSummary {
+  id: string
+  teacher_id: string
+  teacher_name: string
+  lesson_title: string
+  lesson_date: string
+  overall_score: number
+  pace_score: number
+  body_score: number
+  clarity_score: number
+  engagement_score: number
+  created_at: string
+}
+
+export interface AnalysisDetail extends AnalysisSummary {
+  payload: Record<string, unknown>
+}
+
+// ── Rubric Types ─────────────────────────────────────────────────────────
+
+export interface RubricDimension {
+  name: string
+  weight: number
+  description: string
+  max_score: number
+}
+
+export interface Rubric {
+  id: string
+  teacher_id: string | null
+  name: string
+  dimensions: RubricDimension[]
+  created_at: string
+  updated_at: string
+}
+
+// ── Share Types ──────────────────────────────────────────────────────────
+
+export interface ShareLink {
+  share_token: string
+  expires_at: string
+  share_url: string
+}
+
+// ── Timeline / Metrics Types ─────────────────────────────────────────────
+
+export interface AggregatedMetrics {
+  avg_overall: number
+  avg_pace: number
+  avg_body: number
+  avg_clarity: number
+  avg_engagement: number
+  trend_overall: number
+  trend_pace: number
+  trend_body: number
+  trend_clarity: number
+  trend_engagement: number
+  best_lesson_id?: string
+  worst_lesson_id?: string
+  date_range: string[]
+}
+
+export interface TeacherTimeline {
+  teacher_name: string
+  total_lessons: number
+  analyses: AnalysisSummary[]
+  aggregated_metrics: AggregatedMetrics | null
+}
+
+// ── Comparison Types ─────────────────────────────────────────────────────
+
+export interface ComparisonItem {
+  id: string
+  teacher_name: string
+  lesson_title: string
+  lesson_date: string
+  overall_score: number
+  pace_score: number
+  body_score: number
+  clarity_score: number
+  engagement_score: number
+}
+
+export interface ComparisonResult {
+  items: ComparisonItem[]
+  score_differences: Record<string, number>
 }

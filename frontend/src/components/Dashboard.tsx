@@ -34,10 +34,10 @@ function formatUptime(seconds: number): string {
 }
 
 const CAPABILITY_META: Record<string, { icon: typeof Mic; label: string; tab: string }> = {
-  'transcription':          { icon: Mic,           label: 'Transcription',           tab: 'transcribe' },
-  'body-language-analysis': { icon: Eye,           label: 'Body Language Analysis',  tab: 'transcribe' },
-  'full-analysis':          { icon: GraduationCap, label: 'Full Lesson Analysis',    tab: 'transcribe' },
-  'ai-feedback':            { icon: MessageSquare, label: 'AI Teacher Feedback',     tab: 'transcribe' },
+  'transcription':          { icon: Mic,           label: 'Transcription',           tab: 'for-you' },
+  'body-language-analysis': { icon: Eye,           label: 'Body Language Analysis',  tab: 'for-you' },
+  'full-analysis':          { icon: GraduationCap, label: 'Full Lesson Analysis',    tab: 'for-you' },
+  'ai-feedback':            { icon: MessageSquare, label: 'AI Teacher Feedback',     tab: 'for-you' },
 }
 
 export default function Dashboard({ onNavigate }: Props) {
@@ -245,7 +245,7 @@ export default function Dashboard({ onNavigate }: Props) {
               <p className="db-panel-subtitle">Quick start</p>
               <button
                 className="db-action-btn"
-                onClick={() => onNavigate('transcribe')}
+                onClick={() => onNavigate('for-you')}
               >
                 <Sparkles size={14} />
                 {data.capabilities.includes('full-analysis')

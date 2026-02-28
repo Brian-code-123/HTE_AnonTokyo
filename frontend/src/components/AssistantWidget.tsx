@@ -19,21 +19,30 @@ const SUGGESTIONS = [
   'What is Video Generator for?',
   'How do I give feedback to the AI?',
   'What file formats are supported?',
+  'How does AI Coaching work?',
+  'How do I use the Rubric Builder?',
+  'How to compare analyses?',
 ]
 
 const FAQ: Record<string, string> = {
   'how do i transcribe a video':
-    '📤 Go to the **Transcribe** tab. You can either drag-and-drop a video file (MP4, MOV, AVI, MKV, WebM) or paste a YouTube URL. Choose your language, then click "Start Transcribing".',
+    '📤 Go to **For You → Transcribe & Analyse**. You can drag-and-drop a video file (MP4, MOV, AVI, MKV, WebM) or paste a YouTube URL. Choose your language, then click "Start Transcribing".',
   'what is full analysis mode':
-    '🎓 **Full Analysis** runs a complete AI evaluation: it transcribes your lesson, analyses body language, scores the rubric, and maps out knowledge points — all in one step. Toggle it in the Transcribe tab.',
+    '🎓 **Full Analysis** runs a complete AI evaluation: it transcribes your lesson, analyses body language, scores the rubric, and maps out knowledge points — all in one step. Toggle it in the Transcribe tool under **For You**.',
   'how does voice report work':
-    '🔊 In the **Voice Report** tab, paste any text (or it auto-fills with your last transcript). Choose a voice and emotion, then click "Generate Speech". MiniMax TTS converts it to natural audio you can play or download.',
+    '🔊 In **For You → Voice Report**, paste any text (or it auto-fills with your last transcript). Choose a voice and emotion, then click "Generate Speech". MiniMax TTS converts it to natural audio you can play or download.',
   'what is video generator for':
-    '🎬 The **Video Generator** tab lets you describe a concept in text, and MiniMax Hailuo AI will produce a short explanatory video — great for reinforcing complex topics visually.',
+    '🎬 **For You → Video Generator** lets you describe a concept in text, and MiniMax Hailuo AI will produce a short explanatory video — great for reinforcing complex topics visually.',
   'how do i give feedback to the ai':
     '💬 Head to the **Feedback** tab. Paste your transcript, body language notes, or rubric. Add any extra context (subject, grade), then click "Generate Feedback". The AI returns personalised coaching tips.',
   'what file formats are supported':
     '📁 Supported video formats: **MP4, MOV, AVI, MKV, WebM**. Audio is extracted automatically. There is no strict file-size limit, but large files may take longer to process.',
+  'how does ai coaching work':
+    '🧠 Go to **For You → AI Coaching**. Select a teacher profile, then click "Generate Coaching Plan". The AI analyses trend data across all lessons and creates a personalised improvement plan with prioritised action items.',
+  'how do i use the rubric builder':
+    '📋 Open **For You → Rubric Builder**. You can choose a preset rubric or build a custom one with weighted dimensions. Saved rubrics are used to evaluate future lessons.',
+  'how to compare analyses':
+    '🔍 In **For You → Compare Analyses**, select two or more stored lesson analyses. The tool shows a side-by-side score breakdown with difference highlighting.',
 }
 
 function getBotReply(input: string): string {
@@ -56,13 +65,19 @@ function getBotReply(input: string): string {
     return FAQ['how do i give feedback to the ai']
   if (lower.includes('format') || lower.includes('file') || lower.includes('mp4'))
     return FAQ['what file formats are supported']
-  return "🤔 I'm not sure about that. Try asking things like:\n• How do I transcribe a video?\n• What is Full Analysis?\n• How does Voice Report work?"
+  if (lower.includes('coach') || lower.includes('improvement') || lower.includes('plan'))
+    return FAQ['how does ai coaching work']
+  if (lower.includes('rubric') || lower.includes('evaluat') || lower.includes('dimension'))
+    return FAQ['how do i use the rubric builder']
+  if (lower.includes('compare') || lower.includes('side'))
+    return FAQ['how to compare analyses']
+  return "🤔 I'm not sure about that. Try asking things like:\n• How do I transcribe a video?\n• What is Full Analysis?\n• How does AI Coaching work?\n• How do I compare analyses?"
 }
 
 export default function AssistantWidget() {
   const [open, setOpen]         = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { from: 'bot', text: '👋 Hi! I\'m your VoiceTrace guide. Ask me anything about the app, or pick a question below!' },
+    { from: 'bot', text: '👋 Hi! I\'m your VoiceTrace assistant.\n\n💡 Here\'s what I can help with:\n• **For You** tab — All tools in one place (Transcribe, AI Coaching, Rubrics…)\n• **Feedback** tab — AI-generated teaching feedback\n• **Dashboard** — Overview stats & history\n\nPick a question below or type your own!' },
   ])
   const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)

@@ -11,6 +11,12 @@ from app.routes.feedback import router as feedback_router
 from app.routes.full_analysis import router as full_analysis_router
 from app.routes.media import router as media_router
 from app.routes.upload import router as upload_router
+from app.routes.teachers import router as teachers_router
+from app.routes.rubrics import router as rubrics_router
+from app.routes.shares import router as shares_router
+from app.routes.export import router as export_router
+from app.routes.coaching import router as coaching_router
+from app.routes.seed import router as seed_router
 from app.services.persistence import init_db
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -37,6 +43,12 @@ def create_app() -> FastAPI:
     application.include_router(full_analysis_router)
     application.include_router(feedback_router)
     application.include_router(media_router)
+    application.include_router(teachers_router)
+    application.include_router(rubrics_router)
+    application.include_router(shares_router)
+    application.include_router(export_router)
+    application.include_router(coaching_router)
+    application.include_router(seed_router)
 
     @application.on_event("startup")
     async def startup() -> None:
