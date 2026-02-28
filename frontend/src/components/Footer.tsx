@@ -35,7 +35,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           </div>
           <div className="footer-socials">
             <a
-              href="https://github.com"
+              href="https://github.com/Crugo1202/HTE_AnonTokyo"
               target="_blank"
               rel="noopener noreferrer"
               className="footer-social-link"

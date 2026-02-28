@@ -11,6 +11,8 @@ import logging
 
 import requests
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import Response
+from pydantic import BaseModel
 
 from app.config import get_settings
 from app.schemas.response import (
@@ -29,6 +31,19 @@ router = APIRouter(tags=["media"])
 
 MINIMAX_V1_BASE = "https://api.minimax.io/v1"
 MINIMAX_TIMEOUT = 60
+
+ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech"
+ELEVENLABS_TIMEOUT = 60
+
+
+class ElevenLabsTTSRequest(BaseModel):
+    text: str
+    voice_id: str = "21m00Tcm4TlvDq8ikWAM"   # Rachel
+    model_id: str = "eleven_multilingual_v2"
+    stability: float = 0.5
+    similarity_boost: float = 0.75
+    style: float = 0.0
+    speed: float = 1.0
 
 DEFAULT_VOICES = [
     {"id": "male-qn-qingse", "name": "Qingse (Male)", "lang": "zh"},
