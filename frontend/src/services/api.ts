@@ -495,3 +495,26 @@ export async function seedDemoData(): Promise<SeedResult> {
     throw new Error(extractError(err))
   }
 }
+
+// ── ASI One Chat ────────────────────────────────────────────────────────────
+
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface ChatResponse {
+  reply: string
+}
+
+export async function sendChatMessage(
+  message: string,
+  history: ChatMessage[] = [],
+): Promise<ChatResponse> {
+  try {
+    const { data } = await api.post<ChatResponse>('/chat', { message, history })
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}

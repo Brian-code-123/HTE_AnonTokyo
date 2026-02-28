@@ -3010,6 +3010,34 @@ body {
   color: var(--accent-primary);
 }
 
+.assistant-badge-asi {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+
+.coaching-asi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: #fff;
+  letter-spacing: 0.03em;
+  margin-top: 0.5rem;
+}
+
 .assistant-close {
   display: flex;
   align-items: center;

@@ -42,6 +42,7 @@ export interface CoachingPlan {
   generated_at: string
   overall_summary: string
   suggestions: CoachingSuggestion[]
+  powered_by?: string
 }
 
 /** Transcription job lifecycle states */

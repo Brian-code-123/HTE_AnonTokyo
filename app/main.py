@@ -17,6 +17,7 @@ from app.routes.shares import router as shares_router
 from app.routes.export import router as export_router
 from app.routes.coaching import router as coaching_router
 from app.routes.seed import router as seed_router
+from app.routes.chat import router as chat_router
 from app.services.persistence import init_db
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
@@ -49,6 +50,7 @@ def create_app() -> FastAPI:
     application.include_router(export_router)
     application.include_router(coaching_router)
     application.include_router(seed_router)
+    application.include_router(chat_router)
 
     @application.on_event("startup")
     async def startup() -> None:

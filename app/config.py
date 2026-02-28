@@ -11,6 +11,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # ── ASI One AI Agent ────────────────────────────────────────────────────
+    asi_one_api_key: str = "sk_3f44f0d5f4d44c04ba0646b1075ff7255cf5f55aa7b5496281945617e5b65187"
+
     # ── ElevenLabs Speech-to-Text (Scribe API) ───────────────────────────
     elevenlabs_api_key: str = ""
     elevenlabs_stt_model: str = "scribe_v2"

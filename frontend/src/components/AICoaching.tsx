@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react'
 import {
   Brain, TrendingUp, TrendingDown, Minus,
   AlertTriangle, CheckCircle2, Target, Loader2, Database,
-  Users,
+  Users, Sparkles,
 } from 'lucide-react'
 import { fetchTeachers, fetchCoachingPlan, seedDemoData } from '../services/api'
 import type { Teacher, CoachingPlan } from '../types'
@@ -135,6 +135,12 @@ export default function AICoaching() {
               Coaching Plan for {plan.teacher_name}
             </h2>
             <p>{plan.overall_summary}</p>
+            {plan.powered_by && (
+              <span className="coaching-asi-badge">
+                <Sparkles size={11} />
+                Powered by {plan.powered_by}
+              </span>
+            )}
             <span className="coaching-ts">Generated: {new Date(plan.generated_at).toLocaleString()}</span>
           </div>
 

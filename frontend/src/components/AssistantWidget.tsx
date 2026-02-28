@@ -1,120 +1,118 @@
 /**
- * AssistantWidget — Floating AI Guide in the bottom-right corner.
+ * AssistantWidget — Floating AI Guide powered by ASI One.
  *
- * Provides contextual help and tips about each section of VoiceTrace.
- * Fully self-contained; does NOT call any backend API.
+ * Live chat backed by the /api/chat endpoint (ASI One asi1-mini model).
+ * Falls back to a static FAQ if the backend is unreachable.
  */
 import { useState, useRef, useEffect } from 'react'
-import { Bot, X, Send, ChevronDown } from 'lucide-react'
+import { Bot, X, Send, ChevronDown, Loader2, Sparkles } from 'lucide-react'
+import { sendChatMessage } from '../services/api'
+import type { ChatMessage } from '../services/api'
 
 interface Message {
   from: 'bot' | 'user'
   text: string
+  loading?: boolean
 }
 
-const SUGGESTIONS = [
+const QUICK_SUGGESTIONS = [
   'How do I transcribe a video?',
-  'What is Full Analysis mode?',
-  'How does Voice Report work?',
-  'What is Video Generator for?',
-  'How do I give feedback to the AI?',
+  'What is AI Coaching?',
+  'How does Full Analysis work?',
+  'What is the Rubric Builder?',
+  'How do I compare analyses?',
   'What file formats are supported?',
-  'How does AI Coaching work?',
-  'How do I use the Rubric Builder?',
-  'How to compare analyses?',
 ]
 
-const FAQ: Record<string, string> = {
-  'how do i transcribe a video':
-    '📤 Go to **For You → Transcribe & Analyse**. You can drag-and-drop a video file (MP4, MOV, AVI, MKV, WebM) or paste a YouTube URL. Choose your language, then click "Start Transcribing".',
-  'what is full analysis mode':
-    '🎓 **Full Analysis** runs a complete AI evaluation: it transcribes your lesson, analyses body language, scores the rubric, and maps out knowledge points — all in one step. Toggle it in the Transcribe tool under **For You**.',
-  'how does voice report work':
-    '🔊 In **For You → Voice Report**, paste any text (or it auto-fills with your last transcript). Choose a voice and emotion, then click "Generate Speech". MiniMax TTS converts it to natural audio you can play or download.',
-  'what is video generator for':
-    '🎬 **For You → Video Generator** lets you describe a concept in text, and MiniMax Hailuo AI will produce a short explanatory video — great for reinforcing complex topics visually.',
-  'how do i give feedback to the ai':
-    '💬 Head to the **Feedback** tab. Paste your transcript, body language notes, or rubric. Add any extra context (subject, grade), then click "Generate Feedback". The AI returns personalised coaching tips.',
-  'what file formats are supported':
-    '📁 Supported video formats: **MP4, MOV, AVI, MKV, WebM**. Audio is extracted automatically. There is no strict file-size limit, but large files may take longer to process.',
-  'how does ai coaching work':
-    '🧠 Go to **For You → AI Coaching**. Select a teacher profile, then click "Generate Coaching Plan". The AI analyses trend data across all lessons and creates a personalised improvement plan with prioritised action items.',
-  'how do i use the rubric builder':
-    '📋 Open **For You → Rubric Builder**. You can choose a preset rubric or build a custom one with weighted dimensions. Saved rubrics are used to evaluate future lessons.',
-  'how to compare analyses':
-    '🔍 In **For You → Compare Analyses**, select two or more stored lesson analyses. The tool shows a side-by-side score breakdown with difference highlighting.',
-}
-
-function getBotReply(input: string): string {
-  const lower = input.toLowerCase().trim()
-  for (const [key, answer] of Object.entries(FAQ)) {
-    if (lower.includes(key.split(' ')[0]) && lower.includes(key.split(' ').slice(-1)[0])) {
-      return answer
-    }
-  }
-  // Keyword matching fallback
-  if (lower.includes('transcri'))
-    return FAQ['how do i transcribe a video']
-  if (lower.includes('full') || lower.includes('analysis'))
-    return FAQ['what is full analysis mode']
-  if (lower.includes('voice') || lower.includes('tts') || lower.includes('speech'))
-    return FAQ['how does voice report work']
-  if (lower.includes('video') || lower.includes('hailuo') || lower.includes('generat'))
-    return FAQ['what is video generator for']
-  if (lower.includes('feedback'))
-    return FAQ['how do i give feedback to the ai']
-  if (lower.includes('format') || lower.includes('file') || lower.includes('mp4'))
-    return FAQ['what file formats are supported']
-  if (lower.includes('coach') || lower.includes('improvement') || lower.includes('plan'))
-    return FAQ['how does ai coaching work']
-  if (lower.includes('rubric') || lower.includes('evaluat') || lower.includes('dimension'))
-    return FAQ['how do i use the rubric builder']
-  if (lower.includes('compare') || lower.includes('side'))
-    return FAQ['how to compare analyses']
-  return "🤔 I'm not sure about that. Try asking things like:\n• How do I transcribe a video?\n• What is Full Analysis?\n• How does AI Coaching work?\n• How do I compare analyses?"
-}
+const WELCOME_TEXT =
+  "👋 Hi! I'm your VoiceTrace AI guide — powered by **ASI One**.\n\nAsk me anything about the platform, teaching strategies, or how to get the most from your analyses!"
 
 export default function AssistantWidget() {
   const [open, setOpen]         = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { from: 'bot', text: '👋 Hi! I\'m your VoiceTrace assistant.\n\n💡 Here\'s what I can help with:\n• **For You** tab — All tools in one place (Transcribe, AI Coaching, Rubrics…)\n• **Feedback** tab — AI-generated teaching feedback\n• **Dashboard** — Overview stats & history\n\nPick a question below or type your own!' },
+    { from: 'bot', text: WELCOME_TEXT },
   ])
-  const [input, setInput] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const [input, setInput]   = useState('')
+  const [sending, setSending] = useState(false)
+  const bottomRef             = useRef<HTMLDivElement>(null)
+
+  // Build API history from current messages (exclude the welcome message)
+  const buildHistory = (msgs: Message[]): ChatMessage[] =>
+    msgs
+      .filter((_, i) => i > 0)
+      .filter(m => !m.loading)
+      .map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: m.text }))
 
   useEffect(() => {
-    if (open) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-    }
+    if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  const send = (text: string) => {
-    if (!text.trim()) return
-    const userMsg: Message = { from: 'user', text: text.trim() }
-    const botMsg: Message  = { from: 'bot',  text: getBotReply(text) }
-    setMessages(prev => [...prev, userMsg, botMsg])
+  const send = async (text: string) => {
+    const trimmed = text.trim()
+    if (!trimmed || sending) return
+
+    const userMsg: Message = { from: 'user', text: trimmed }
+    const placeholder: Message = { from: 'bot', text: '', loading: true }
+
+    setMessages(prev => {
+      const updated = [...prev, userMsg, placeholder]
+      // Scroll after state updates
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+      return updated
+    })
     setInput('')
+    setSending(true)
+
+    try {
+      // Build history from messages before the new user message (excluding loading placeholders)
+      const historyMsgs = buildHistory(messages)
+
+      const { reply } = await sendChatMessage(trimmed, historyMsgs)
+
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[updated.length - 1] = { from: 'bot', text: reply }
+        return updated
+      })
+    } catch {
+      setMessages(prev => {
+        const updated = [...prev]
+        updated[updated.length - 1] = {
+          from: 'bot',
+          text: "⚠️ I couldn't reach the AI right now. Make sure the backend is running, then try again.",
+        }
+        return updated
+      })
+    } finally {
+      setSending(false)
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+    }
   }
 
   const handleKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') send(input)
+    if (e.key === 'Enter' && !e.shiftKey) send(input)
   }
 
   return (
     <div className="assistant-root">
-      {/* Chat Panel */}
       {open && (
         <div className="assistant-panel">
+          {/* Header */}
           <div className="assistant-header">
             <span className="assistant-header-title">
               <Bot size={16} />
               VoiceTrace Guide
+              <span className="assistant-badge-asi">
+                <Sparkles size={10} />
+                ASI One
+              </span>
             </span>
             <button className="assistant-close" onClick={() => setOpen(false)} aria-label="Close">
               <ChevronDown size={16} />
             </button>
           </div>
 
+          {/* Messages */}
           <div className="assistant-messages">
             {messages.map((msg, i) => (
               <div key={i} className={`assistant-msg ${msg.from}`}>
@@ -123,38 +121,53 @@ export default function AssistantWidget() {
                     <Bot size={13} />
                   </div>
                 )}
-                <div className="assistant-bubble">{msg.text}</div>
+                {msg.loading ? (
+                  <div className="assistant-bubble assistant-bubble-loading">
+                    <Loader2 size={14} className="spin" />
+                    <span>Thinking…</span>
+                  </div>
+                ) : (
+                  <div className="assistant-bubble">{msg.text}</div>
+                )}
               </div>
             ))}
             <div ref={bottomRef} />
           </div>
 
-          {/* Quick suggestions */}
-          <div className="assistant-suggestions">
-            {SUGGESTIONS.map(s => (
-              <button key={s} className="assistant-suggestion" onClick={() => send(s)}>
-                {s}
-              </button>
-            ))}
-          </div>
+          {/* Quick suggestions — only show near start of conversation */}
+          {messages.length <= 3 && (
+            <div className="assistant-suggestions">
+              {QUICK_SUGGESTIONS.map(s => (
+                <button
+                  key={s}
+                  className="assistant-suggestion"
+                  onClick={() => send(s)}
+                  disabled={sending}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Input */}
           <div className="assistant-input-row">
             <input
               className="assistant-input"
               type="text"
-              placeholder="Ask a question…"
+              placeholder="Ask anything about VoiceTrace…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
+              disabled={sending}
             />
             <button
               className="assistant-send"
               onClick={() => send(input)}
-              disabled={!input.trim()}
+              disabled={!input.trim() || sending}
               aria-label="Send"
             >
-              <Send size={14} />
+              {sending ? <Loader2 size={14} className="spin" /> : <Send size={14} />}
             </button>
           </div>
         </div>
