@@ -81,6 +81,7 @@ export default function FeedbackTab() {
       </section>
 
       <div className="glass-card feedback-card">
+        {/* Left: Input Fields */}
         <div className="feedback-inputs">
           {/* Transcript */}
           <div className="fb-field">
@@ -90,7 +91,6 @@ export default function FeedbackTab() {
             </label>
             <textarea
               className="fb-textarea"
-              rows={5}
               placeholder="Paste your lesson transcript here…"
               value={transcript}
               onChange={e => setTranscript(e.target.value)}
@@ -107,7 +107,6 @@ export default function FeedbackTab() {
             </label>
             <textarea
               className="fb-textarea"
-              rows={4}
               placeholder="Paste body language analysis report (optional)…"
               value={bodyLanguage}
               onChange={e => setBodyLanguage(e.target.value)}
@@ -124,7 +123,6 @@ export default function FeedbackTab() {
             </label>
             <textarea
               className="fb-textarea"
-              rows={4}
               placeholder="Paste the rubric or evaluation criteria (optional)…"
               value={rubric}
               onChange={e => setRubric(e.target.value)}
@@ -141,59 +139,74 @@ export default function FeedbackTab() {
             </label>
             <textarea
               className="fb-textarea"
-              rows={2}
               placeholder="Subject, grade level, focus areas, etc…"
               value={extraContext}
               onChange={e => setExtraContext(e.target.value)}
               disabled={loading}
             />
           </div>
-        </div>
 
-        {/* Actions */}
-        <div className="fb-actions">
-          <button className="btn-primary" onClick={handleSubmit} disabled={!canSubmit}>
-            {loading
-              ? <><Loader2 size={17} className="db-spinner" /> Generating…</>
-              : <><Send size={17} /> Generate Feedback</>
-            }
-          </button>
-          {(result || error) && (
-            <button className="btn-reset" onClick={handleReset}>
-              <RotateCcw size={14} />
-              Reset
+          {/* Actions */}
+          <div className="fb-actions">
+            <button className="btn-primary" onClick={handleSubmit} disabled={!canSubmit}>
+              {loading
+                ? <><Loader2 size={17} className="db-spinner" /> Generating…</>
+                : <><Send size={17} /> Generate Feedback</>
+              }
             </button>
+            {(result || error) && (
+              <button className="btn-reset" onClick={handleReset}>
+                <RotateCcw size={14} />
+                Reset
+              </button>
+            )}
+          </div>
+
+          {/* Error */}
+          {error && (
+            <div className="error-banner" style={{ margin: '0 0 0' }}>
+              {error}
+            </div>
           )}
         </div>
 
-        {/* Error */}
-        {error && (
-          <div className="error-banner" style={{ margin: '0 1.5rem 1.5rem' }}>
-            {error}
-          </div>
-        )}
+        {/* Right: Result Output */}
+        <div className="feedback-output">
+          {!result && !loading && (
+            <div className="fb-empty-state">
+              <Sparkles size={32} />
+              <p>Generate feedback to see results here</p>
+            </div>
+          )}
 
-        {/* Result */}
-        {result && (
-          <div className="fb-result">
-            <div className="fb-result-header">
-              <span className="fb-result-title">
-                <Sparkles size={16} />
-                AI Feedback
-              </span>
-              <div className="fb-result-meta">
-                <span className="meta-chip">{result.model}</span>
-                <button className="btn-download" onClick={handleCopy}>
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  {copied ? 'Copied!' : 'Copy'}
-                </button>
+          {loading && (
+            <div className="fb-loading-state">
+              <Loader2 size={28} className="db-spinner" />
+              <p>Generating your feedback…</p>
+            </div>
+          )}
+
+          {result && (
+            <div className="fb-result">
+              <div className="fb-result-header">
+                <span className="fb-result-title">
+                  <Sparkles size={16} />
+                  AI Feedback
+                </span>
+                <div className="fb-result-meta">
+                  <span className="meta-chip">{result.model}</span>
+                  <button className="btn-download" onClick={handleCopy}>
+                    {copied ? <Check size={14} /> : <Copy size={14} />}
+                    {copied ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+              <div className="fb-result-body">
+                {result.feedback}
               </div>
             </div>
-            <div className="fb-result-body">
-              {result.feedback}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   )

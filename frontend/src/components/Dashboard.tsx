@@ -89,39 +89,6 @@ export default function Dashboard({ onNavigate }: Props) {
     return Array.from(new Set(history.events.map(e => e.event_type))).sort()
   }, [history])
 
-  function renderValue(value: unknown): JSX.Element {
-    if (value === null || value === undefined) return <span style={{ opacity: 0.7 }}>null</span>
-    if (typeof value === 'string') return <span>{value}</span>
-    if (typeof value === 'number' || typeof value === 'boolean') return <span>{String(value)}</span>
-    if (Array.isArray(value)) {
-      if (value.length === 0) return <span>[]</span>
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          {value.map((item, idx) => (
-            <div key={idx} style={{ paddingLeft: '0.75rem', borderLeft: '2px solid var(--border-color)' }}>
-              {renderValue(item)}
-            </div>
-          ))}
-        </div>
-      )
-    }
-    if (typeof value === 'object') {
-      const entries = Object.entries(value as Record<string, unknown>)
-      if (entries.length === 0) return <span>{'{}'}</span>
-      return (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-          {entries.map(([k, v]) => (
-            <div key={k} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '0.5rem' }}>
-              <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{k}</span>
-              <div>{renderValue(v)}</div>
-            </div>
-          ))}
-        </div>
-      )
-    }
-    return <span>{String(value)}</span>
-  }
-
   return (
     <div className="dashboard">
       {/* ── Header row ─────────────────────────────────────────── */}
@@ -221,7 +188,7 @@ export default function Dashboard({ onNavigate }: Props) {
             </div>
           )}
 
-          <ul className="db-service-list">
+          <ul className="db-service-list db-service-list-compact">
             {data?.services.map(svc => (
               <li key={svc.name} className="db-service-item">
                 <span className="db-service-dot">
@@ -257,7 +224,7 @@ export default function Dashboard({ onNavigate }: Props) {
             </p>
           )}
 
-          <ul className="db-cap-list">
+          <ul className="db-cap-list db-cap-list-compact">
             {data?.capabilities.map(cap => {
               const meta = CAPABILITY_META[cap]
               if (!meta) return null
@@ -320,8 +287,8 @@ export default function Dashboard({ onNavigate }: Props) {
             </div>
           )}
 
-          <div className="db-service-list" style={{ maxHeight: '360px', overflow: 'auto' }}>
-            {history?.events.map(evt => (
+          <div className="db-service-list">
+          {history?.events.slice(0, 6).map(evt => (
               <button
                 key={evt.id}
                 className="db-service-item"
@@ -346,7 +313,12 @@ export default function Dashboard({ onNavigate }: Props) {
                 </span>
               </button>
             ))}
-            {!history?.events.length && !loading && (
+            {history && history.events.length > 6 && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '0.5rem 0 0' }}>
+                … and {history.events.length - 6} more. See History tab for all.
+              </p>
+            )}
+            {!history?.events?.length && !loading && (
               <p className="db-empty">No saved generations yet.</p>
             )}
           </div>
@@ -354,31 +326,25 @@ export default function Dashboard({ onNavigate }: Props) {
 
         <div className="glass-card db-panel">
           <h3 className="db-panel-title">
-            <Activity size={16} /> Full Data Display
+            <Activity size={16} /> Event Details
           </h3>
 
           {!selectedEvent && (
-            <p className="db-empty">Select an event to view all analytics fields.</p>
+            <p className="db-empty">Select an event to view details.</p>
           )}
 
           {selectedEvent && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <div className="meta-chip">
                 <strong>{selectedEvent.event_type}</strong> &nbsp;#{selectedEvent.id}
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr', gap: '0.35rem', fontSize: '0.85rem' }}>
                 <span style={{ color: 'var(--text-muted)' }}>Created</span>
                 <span>{new Date(selectedEvent.created_at).toLocaleString()}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Status</span>
                 <span>{selectedEvent.status}</span>
                 <span style={{ color: 'var(--text-muted)' }}>Job ID</span>
-                <span>{selectedEvent.job_id || '—'}</span>
-                <span style={{ color: 'var(--text-muted)' }}>Source</span>
-                <span>{selectedEvent.source || '—'}</span>
-              </div>
-
-              <div className="transcript-box" style={{ maxHeight: '360px' }}>
-                {renderValue(selectedEvent.payload)}
+                <span style={{ fontFamily: 'monospace', fontSize: '0.8rem', overflow: 'hidden', textOverflow: 'ellipsis' }}>{selectedEvent.job_id || '—'}</span>
               </div>
             </div>
           )}
