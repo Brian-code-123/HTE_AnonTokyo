@@ -14,7 +14,7 @@ export type InputMode = 'upload' | 'youtube'
 export type AnalysisMode = 'transcribe' | 'full-analysis'
 
 /** Top-level navigation tabs */
-export type AppTab = 'dashboard' | 'transcribe' | 'voice-report' | 'video-gen'
+export type AppTab = 'dashboard' | 'transcribe' | 'voice-report' | 'video-gen' | 'feedback'
 
 /** Transcription job lifecycle states */
 export type JobStatus =

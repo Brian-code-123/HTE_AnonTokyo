@@ -8,7 +8,6 @@
  * - Tab-based navigation between features
  */
 import { useState } from 'react'
-import { LayoutDashboard, Mic, Volume2, Clapperboard } from 'lucide-react'
 import { useTheme } from './hooks/useTheme'
 import Header from './components/Header'
 import Dashboard from './components/Dashboard'
@@ -18,19 +17,14 @@ import ResultView from './components/ResultView'
 import VoiceReport from './components/VoiceReport'
 import VideoGenerator from './components/VideoGenerator'
 import AnalysisResultView from './components/AnalysisResultView'
+import FeedbackTab from './components/FeedbackTab'
+import AssistantWidget from './components/AssistantWidget'
 import { transcribeFile, transcribeYoutube, fullAnalysisFile, fullAnalysisYoutube } from './services/api'
 import type { AppTab, AnalysisMode, InputMode, ProgressState, TranscriptResult, FullAnalysisResult } from './types'
 
 
 /** Default idle state for progress indicator */
 const IDLE_PROGRESS: ProgressState = { status: 'idle', percent: 0, message: '' }
-
-const TABS: { key: AppTab; label: string; icon: typeof Mic }[] = [
-  { key: 'dashboard',    label: 'Dashboard',    icon: LayoutDashboard },
-  { key: 'transcribe',   label: 'Transcribe',   icon: Mic },
-  { key: 'voice-report', label: 'Voice Report',  icon: Volume2 },
-  { key: 'video-gen',    label: 'Video Gen',     icon: Clapperboard },
-]
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -121,21 +115,12 @@ export default function App() {
 
   return (
     <div className="app-wrapper">
-      <Header theme={theme} onToggle={toggle} />
-
-      {/* ── Tab Navigation ──────────────────────────────────────────────── */}
-      <nav className="tab-nav">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            className={`tab-btn ${activeTab === tab.key ? 'active' : ''}`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            <tab.icon size={18} />
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      <Header
+        theme={theme}
+        onToggle={toggle}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+      />
 
       <main className="main-content">
         {/* ─── Tab: Dashboard ─────────────────────────────────────────── */}
@@ -226,11 +211,17 @@ export default function App() {
             </div>
           </>
         )}
+
+        {/* ─── Tab: Feedback ──────────────────────────────────────────── */}
+        {activeTab === 'feedback' && <FeedbackTab />}
       </main>
 
       <footer className="footer">
         VoiceTrace — HTE AnonTokyo &nbsp;·&nbsp; Powered by MiniMax &nbsp;·&nbsp; {new Date().getFullYear()}
       </footer>
+
+      {/* ── Floating AI Assistant ──────────────────────────────────────── */}
+      <AssistantWidget />
     </div>
   )
 }
