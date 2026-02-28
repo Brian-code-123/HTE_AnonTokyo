@@ -157,7 +157,7 @@ export default function UploadSection({
               <UploadCloud />
             </div>
             <h3>Drop your video or audio here</h3>
-            <p>or click to browse — max 500 MB</p>
+            <p>or click to browse — large files upload directly to S3</p>
             <div className="file-badges">
               {['.mp4', '.mov', '.mkv', '.avi', '.mp3', '.wav', '.m4a', '.webm'].map(ext => (
                 <span key={ext} className="file-badge">{ext}</span>

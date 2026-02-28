@@ -21,6 +21,7 @@ from app.schemas.response import (
     VideoGenerateResponse,
     VideoStatusResponse,
 )
+from app.services.persistence import save_event
 
 logger = logging.getLogger(__name__)
 
@@ -108,13 +109,25 @@ def generate_tts(body: TTSGenerateRequest) -> TTSGenerateResponse:
 
     extra = data.get("extra_info") or {}
     media = data.get("data") or {}
-    return TTSGenerateResponse(
+    result = TTSGenerateResponse(
         audio_url=media.get("audio", ""),
         duration_ms=extra.get("audio_length", 0),
         sample_rate=extra.get("audio_sample_rate", 32000),
         word_count=extra.get("word_count", 0),
         format=extra.get("audio_format", "mp3"),
     )
+    save_event(
+        "tts_generation",
+        {
+            "voice_id": body.voice_id,
+            "emotion": body.emotion,
+            "word_count": result.word_count,
+            "duration_ms": result.duration_ms,
+            "format": result.format,
+        },
+        source="tts_generate",
+    )
+    return result
 
 
 @router.get("/api/tts/voices", response_model=TTSVoicesResponse)
@@ -153,6 +166,16 @@ def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
     task_id = data.get("task_id")
     if not task_id:
         raise HTTPException(status_code=502, detail="Video generation response missing task_id")
+    save_event(
+        "video_generation",
+        {
+            "task_id": task_id,
+            "model": body.model,
+            "duration": body.duration,
+            "resolution": body.resolution,
+        },
+        source="video_generate",
+    )
     return VideoGenerateResponse(task_id=task_id)
 
 
@@ -202,4 +225,14 @@ def get_video_status(task_id: str) -> VideoStatusResponse:
         except (requests.RequestException, ValueError):
             logger.warning("Video download URL fetch failed for file_id=%s", result.file_id)
 
+    save_event(
+        "video_status",
+        {
+            "task_id": result.task_id,
+            "status": result.status,
+            "file_id": result.file_id,
+            "has_download_url": bool(result.download_url),
+        },
+        source="video_status",
+    )
     return result

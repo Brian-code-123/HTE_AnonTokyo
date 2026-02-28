@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException
 from app.config import get_settings
 from app.schemas.response import FeedbackRequest, FeedbackResponse
 from app.services.minimax_feedback import MinimaxFeedbackService
+from app.services.persistence import save_event
 from app.services.session_stats import stats as session_stats
 
 logger = logging.getLogger(__name__)
@@ -54,10 +55,23 @@ async def generate_feedback(body: FeedbackRequest) -> FeedbackResponse:
         )
 
         session_stats.feedback_generated += 1
-        return FeedbackResponse(
+        response = FeedbackResponse(
             feedback=feedback,
             model=settings.minimax_model,
         )
+        save_event(
+            "feedback",
+            {
+                "model": settings.minimax_model,
+                "feedback_chars": len(feedback),
+                "has_transcript": bool(body.transcript),
+                "has_body_language_report": bool(body.body_language_report),
+                "has_rubric_evaluation": bool(body.rubric_evaluation),
+                "has_additional_context": bool(body.additional_context),
+            },
+            source="feedback",
+        )
+        return response
 
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))

@@ -153,6 +153,34 @@ class FeedbackResponse(BaseModel):
     model: str
 
 
+# ── Direct upload via S3 ──────────────────────────────────────────────────────
+class PresignUploadRequest(BaseModel):
+    file_name: str
+    content_type: str | None = None
+
+
+class PresignUploadResponse(BaseModel):
+    upload_id: str
+    s3_key: str
+    upload_url: str
+    expires_in: int
+
+
+class AnalyzeS3Request(BaseModel):
+    s3_key: str
+    language: str = "auto"
+    file_name: str | None = None
+
+
+class FullAnalysisS3Request(BaseModel):
+    s3_key: str
+    language: str = "auto"
+    use_placeholder: bool = True
+    model: str = "gemini-3.1-pro-preview"
+    segment_duration: int = 180
+    file_name: str | None = None
+
+
 # ── MiniMax TTS + Video ─────────────────────────────────────────────────────
 class TTSGenerateRequest(BaseModel):
     text: str

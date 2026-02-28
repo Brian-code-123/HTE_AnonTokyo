@@ -26,10 +26,13 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from app.config import get_settings
 from app.services.s3_upload import download_from_s3
 from app.schemas.response import (
+    AnalyzeS3Request,
     AnalysisResponse,
     BodyLanguageRequest,
     BodyLanguageResponse,
     FluctuationWindow,
+    PresignUploadRequest,
+    PresignUploadResponse,
     SegmentResult,
     TranscriptResult,
     TranscriptSegment,
@@ -45,6 +48,8 @@ from app.services.gemini_body_language import (
 )
 from app.services.session_stats import stats as session_stats
 from app.services.elevenlabs_transcribe import ElevenLabsTranscribeService
+from app.services.persistence import save_event
+from app.services.s3_uploads import create_presigned_upload, download_s3_file
 from app.services.voice_analysis import calculate_fluctuation_timeline
 from app.services.youtube_service import YouTubeDownloader, is_valid_youtube_url
 
@@ -73,6 +78,23 @@ def _build_response(ws_result, job_id: str) -> TranscriptResult:
         full_text=ws_result.full_text,
         segments=segments,
         srt_content=ws_result.srt_content,
+    )
+
+
+@router.post("/api/uploads/presign", response_model=PresignUploadResponse)
+async def presign_upload(body: PresignUploadRequest) -> PresignUploadResponse:
+    settings = get_settings()
+    try:
+        s3_key, upload_url = create_presigned_upload(settings, body.file_name, body.content_type)
+    except ValueError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    upload_id = Path(s3_key).stem
+    return PresignUploadResponse(
+        upload_id=upload_id,
+        s3_key=s3_key,
+        upload_url=upload_url,
+        expires_in=settings.s3_presign_expires_seconds,
     )
 
 
@@ -152,7 +174,20 @@ async def analyze_file(
                     job_id, len(ws_result.segments), ws_result.language)
 
         session_stats.transcriptions += 1
-        return _build_response(ws_result, job_id)
+        response = _build_response(ws_result, job_id)
+        save_event(
+            "transcription",
+            {
+                "language": response.language,
+                "duration": response.duration,
+                "segment_count": len(response.segments),
+                "source_type": "upload",
+                "file_name": filename,
+            },
+            job_id=job_id,
+            source="analyze_file",
+        )
+        return response
 
     except HTTPException:
         raise
@@ -167,6 +202,57 @@ async def analyze_file(
             shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception:
             pass
+
+
+@router.post("/api/analyze/s3", response_model=TranscriptResult)
+async def analyze_file_from_s3(body: AnalyzeS3Request) -> TranscriptResult:
+    settings = get_settings()
+    job_id = uuid.uuid4().hex
+    ext = Path(body.file_name or body.s3_key).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    tmp_dir = Path(settings.temp_dir) / f"vt_{job_id}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    raw_path = str(tmp_dir / f"input{ext}")
+    wav_path = str(tmp_dir / "audio.wav")
+
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, download_s3_file, settings, body.s3_key, raw_path)
+
+        await loop.run_in_executor(None, extract_audio, raw_path, wav_path)
+        if not settings.elevenlabs_api_key:
+            raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured.")
+
+        svc = ElevenLabsTranscribeService(settings.elevenlabs_api_key, settings.elevenlabs_stt_model)
+        ws_result = await loop.run_in_executor(None, svc.transcribe, wav_path, body.language)
+        session_stats.transcriptions += 1
+        response = _build_response(ws_result, job_id)
+        save_event(
+            "transcription",
+            {
+                "language": response.language,
+                "duration": response.duration,
+                "segment_count": len(response.segments),
+                "source_type": "s3",
+                "s3_key": body.s3_key,
+            },
+            job_id=job_id,
+            source="analyze_s3",
+        )
+        return response
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -204,7 +290,20 @@ async def analyze_youtube(body: YouTubeRequest) -> TranscriptResult:
                     job_id, len(ws_result.segments), ws_result.language)
 
         session_stats.transcriptions += 1
-        return _build_response(ws_result, job_id)
+        response = _build_response(ws_result, job_id)
+        save_event(
+            "transcription",
+            {
+                "language": response.language,
+                "duration": response.duration,
+                "segment_count": len(response.segments),
+                "source_type": "youtube",
+                "youtube_url": body.url,
+            },
+            job_id=job_id,
+            source="analyze_youtube",
+        )
+        return response
 
     except HTTPException:
         raise
@@ -404,11 +503,23 @@ async def analyze_teaching(file: UploadFile) -> AnalysisResponse:
         timeline = [FluctuationWindow(**w) for w in timeline_raw]
 
         session_stats.transcriptions += 1
-        return AnalysisResponse(
+        response = AnalysisResponse(
             status="success",
             transcript=transcript,
             fluctuation_timeline=timeline,
         )
+        save_event(
+            "legacy_analysis",
+            {
+                "timeline_count": len(timeline),
+                "transcript_chars": len(transcript),
+                "source_type": "upload",
+                "file_name": filename,
+            },
+            job_id=job_id,
+            source="analyze_teaching",
+        )
+        return response
 
     finally:
         for p in (wav_path, mp4_path):

@@ -11,6 +11,7 @@ ECR_REPO="hte-anontokyo"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${LAMBDA_ROLE_NAME}"
 LOG_GROUP="/aws/lambda/${LAMBDA_FUNCTION_NAME}"
+S3_UPLOAD_BUCKET="${S3_UPLOAD_BUCKET:-${APP_NAME}-uploads-${ACCOUNT_ID}}"
 
 echo "=== HTE AnonTokyo Lambda + CloudFront Setup ==="
 echo "Region: $REGION | Account: $ACCOUNT_ID"
@@ -38,8 +39,40 @@ aws iam attach-role-policy \
 
 echo "   Role ready: $ROLE_ARN"
 
-# ── 2. Ensure CloudWatch log group exists ────────────────────────────────────
-echo "2) Ensuring log group exists: ${LOG_GROUP}"
+# ── 1b. Ensure S3 permissions for direct upload workflow ─────────────────────
+echo "1b) Ensuring IAM policy allows S3 upload/download"
+aws iam put-role-policy \
+  --role-name "$LAMBDA_ROLE_NAME" \
+  --policy-name "${APP_NAME}-s3-upload-access" \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [
+      {
+        \"Effect\": \"Allow\",
+        \"Action\": [\"s3:GetObject\", \"s3:PutObject\", \"s3:DeleteObject\"],
+        \"Resource\": \"arn:aws:s3:::${S3_UPLOAD_BUCKET}/*\"
+      },
+      {
+        \"Effect\": \"Allow\",
+        \"Action\": [\"s3:ListBucket\"],
+        \"Resource\": \"arn:aws:s3:::${S3_UPLOAD_BUCKET}\"
+      }
+    ]
+  }" >/dev/null
+
+# ── 2. Ensure S3 bucket + CloudWatch log group exists ────────────────────────
+echo "2) Ensuring upload bucket exists: ${S3_UPLOAD_BUCKET}"
+if ! aws s3api head-bucket --bucket "$S3_UPLOAD_BUCKET" >/dev/null 2>&1; then
+  if [ "$REGION" = "us-east-1" ]; then
+    aws s3api create-bucket --bucket "$S3_UPLOAD_BUCKET" >/dev/null
+  else
+    aws s3api create-bucket \
+      --bucket "$S3_UPLOAD_BUCKET" \
+      --create-bucket-configuration "LocationConstraint=${REGION}" >/dev/null
+  fi
+fi
+
+echo "2b) Ensuring log group exists: ${LOG_GROUP}"
 if ! aws logs describe-log-groups \
   --region "$REGION" \
   --log-group-name-prefix "$LOG_GROUP" \
@@ -194,4 +227,7 @@ echo "  AWS_SECRET_ACCESS_KEY   - AWS deployer secret key"
 echo "  ELEVENLABS_API_KEY     - ElevenLabs API key (Speech-to-Text)"
 echo "  GEMINI_API_KEY         - Google Gemini API key (body language, rubric)"
 echo "  MINIMAX_API_KEY        - Minimax API key (AI feedback)"
+echo "  S3_UPLOAD_BUCKET       - S3 bucket for large direct uploads (default: ${S3_UPLOAD_BUCKET})"
+echo "  S3_UPLOAD_REGION       - S3 bucket region (default: ${REGION})"
+echo "  S3_UPLOAD_PREFIX       - Object prefix, e.g. uploads"
 echo "  CLOUDFRONT_DISTRIBUTION_ID = ${DIST_ID}"

@@ -26,6 +26,7 @@ from app.schemas.response import (
     FullAnalysisRequest,
     FullAnalysisResponse,
     KnowledgePointReport,
+    FullAnalysisS3Request,
     SegmentResult,
     TranscriptResult,
     TranscriptSegment,
@@ -47,6 +48,8 @@ from app.services.placeholder_data import (
 from app.services.session_stats import stats as session_stats
 from app.services.elevenlabs_transcribe import ElevenLabsTranscribeService
 from app.services.voice_analysis import calculate_fluctuation_timeline
+from app.services.persistence import save_event
+from app.services.s3_uploads import download_s3_file
 from app.services.youtube_service import YouTubeDownloader, is_valid_youtube_url
 
 logger = logging.getLogger(__name__)
@@ -134,7 +137,7 @@ async def full_analysis_file(
         body_language = load_placeholder_body_language()
         session_stats.full_analyses += 1
         display_name = (file.filename if file else filename) or (s3_key or "upload")
-        return FullAnalysisResponse(
+        response = FullAnalysisResponse(
             job_id=job_id,
             video_source=display_name,
             is_placeholder=True,
@@ -142,6 +145,18 @@ async def full_analysis_file(
             body_language=body_language,
             rubric_evaluation=PLACEHOLDER_RUBRIC_EVALUATION,
         )
+        save_event(
+            "full_analysis",
+            {
+                "is_placeholder": True,
+                "source_type": "s3" if s3_key else "upload",
+                "file_name": display_name,
+                "s3_key": s3_key,
+            },
+            job_id=job_id,
+            source="full_analysis_file",
+        )
+        return response
 
     # ── Resolve input path: from file or from S3 ─────────────────────────────
     if s3_key:
@@ -256,7 +271,7 @@ async def full_analysis_file(
                 logger.warning("[%s] Knowledge point analysis failed (non-fatal): %s", job_id, exc)
 
         session_stats.full_analyses += 1
-        return FullAnalysisResponse(
+        response = FullAnalysisResponse(
             job_id=job_id,
             video_source=display_name,
             is_placeholder=False,
@@ -266,6 +281,20 @@ async def full_analysis_file(
             fluctuation_timeline=fluctuation_timeline,
             knowledge_points=knowledge_points,
         )
+        save_event(
+            "full_analysis",
+            {
+                "is_placeholder": False,
+                "source_type": "upload",
+                "file_name": filename,
+                "has_body_language": body_language is not None,
+                "segment_count": body_language.total_segments if body_language else 0,
+                "transcript_duration": transcript_result.duration,
+            },
+            job_id=job_id,
+            source="full_analysis_file",
+        )
+        return response
 
     except HTTPException:
         raise
@@ -279,6 +308,113 @@ async def full_analysis_file(
             shutil.rmtree(tmp_dir, ignore_errors=True)
         except Exception:
             pass
+
+
+@router.post("/api/full-analysis/s3", response_model=FullAnalysisResponse)
+async def full_analysis_s3(body: FullAnalysisS3Request) -> FullAnalysisResponse:
+    settings = get_settings()
+    job_id = uuid.uuid4().hex
+    model = body.model or settings.gemini_model
+
+    if body.use_placeholder:
+        body_language = load_placeholder_body_language()
+        session_stats.full_analyses += 1
+        response = FullAnalysisResponse(
+            job_id=job_id,
+            video_source=body.file_name or body.s3_key,
+            is_placeholder=True,
+            transcript=None,
+            body_language=body_language,
+            rubric_evaluation=PLACEHOLDER_RUBRIC_EVALUATION,
+        )
+        save_event(
+            "full_analysis",
+            {"is_placeholder": True, "source_type": "s3", "s3_key": body.s3_key},
+            job_id=job_id,
+            source="full_analysis_s3",
+        )
+        return response
+
+    api_key = settings.gemini_api_key
+    use_gemini = bool(api_key)
+
+    ext = Path(body.file_name or body.s3_key).suffix.lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type '{ext}'. Accepted: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+        )
+
+    tmp_dir = Path(settings.temp_dir) / f"fas3_{job_id}"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = str(tmp_dir / "results")
+    raw_path = str(tmp_dir / f"input{ext}")
+    wav_path = str(tmp_dir / "audio.wav")
+
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, download_s3_file, settings, body.s3_key, raw_path)
+        await loop.run_in_executor(None, extract_audio, raw_path, wav_path)
+
+        if not settings.elevenlabs_api_key:
+            raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured.")
+        svc = ElevenLabsTranscribeService(settings.elevenlabs_api_key, settings.elevenlabs_stt_model)
+        ws_result = await loop.run_in_executor(None, svc.transcribe, wav_path, body.language)
+        transcript_result = _build_transcript_result(ws_result, job_id)
+
+        body_language: BodyLanguageSummary | None = None
+        if ext in VIDEO_EXTENSIONS:
+            if use_gemini:
+                file_uri = await loop.run_in_executor(None, upload_video_to_gemini, api_key, raw_path)
+                duration = await loop.run_in_executor(None, get_video_duration, raw_path)
+                bl_results = await loop.run_in_executor(
+                    None,
+                    analyze_body_language,
+                    api_key, model, file_uri, duration, output_dir, body.segment_duration,
+                )
+                body_language = _build_body_language_summary(bl_results, model, output_dir)
+            else:
+                body_language = load_placeholder_body_language()
+
+        bl_report = body_language.combined_report if body_language else None
+        if use_gemini:
+            rubric_evaluation = await loop.run_in_executor(
+                None, evaluate_with_gemini, api_key, model, ws_result.full_text, bl_report,
+            )
+        else:
+            rubric_evaluation = PLACEHOLDER_RUBRIC_EVALUATION
+
+        session_stats.full_analyses += 1
+        response = FullAnalysisResponse(
+            job_id=job_id,
+            video_source=body.file_name or body.s3_key,
+            is_placeholder=False,
+            transcript=transcript_result,
+            body_language=body_language,
+            rubric_evaluation=rubric_evaluation,
+        )
+        save_event(
+            "full_analysis",
+            {
+                "is_placeholder": False,
+                "source_type": "s3",
+                "s3_key": body.s3_key,
+                "has_body_language": body_language is not None,
+                "segment_count": body_language.total_segments if body_language else 0,
+                "transcript_duration": transcript_result.duration,
+            },
+            job_id=job_id,
+            source="full_analysis_s3",
+        )
+        return response
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    finally:
+        shutil.rmtree(tmp_dir, ignore_errors=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -297,7 +433,7 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
     if body.use_placeholder:
         body_language = load_placeholder_body_language()
         session_stats.full_analyses += 1
-        return FullAnalysisResponse(
+        response = FullAnalysisResponse(
             job_id=job_id,
             video_source=body.url,
             is_placeholder=True,
@@ -305,6 +441,13 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
             body_language=body_language,
             rubric_evaluation=PLACEHOLDER_RUBRIC_EVALUATION,
         )
+        save_event(
+            "full_analysis",
+            {"is_placeholder": True, "source_type": "youtube", "youtube_url": body.url},
+            job_id=job_id,
+            source="full_analysis_youtube",
+        )
+        return response
 
     # ── Live analysis pipeline ────────────────────────────────────────────
     api_key = body.gemini_api_key or settings.gemini_api_key
@@ -398,7 +541,7 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
                 logger.warning("[%s] Knowledge point analysis failed (non-fatal): %s", job_id, exc)
 
         session_stats.full_analyses += 1
-        return FullAnalysisResponse(
+        response = FullAnalysisResponse(
             job_id=job_id,
             video_source=body.url,
             is_placeholder=False,
@@ -408,6 +551,20 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
             fluctuation_timeline=fluctuation_timeline,
             knowledge_points=knowledge_points,
         )
+        save_event(
+            "full_analysis",
+            {
+                "is_placeholder": False,
+                "source_type": "youtube",
+                "youtube_url": body.url,
+                "has_body_language": body_language is not None,
+                "segment_count": body_language.total_segments if body_language else 0,
+                "transcript_duration": transcript_result.duration,
+            },
+            job_id=job_id,
+            source="full_analysis_youtube",
+        )
+        return response
 
     except HTTPException:
         raise

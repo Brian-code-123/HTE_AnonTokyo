@@ -11,6 +11,7 @@ from app.routes.feedback import router as feedback_router
 from app.routes.full_analysis import router as full_analysis_router
 from app.routes.media import router as media_router
 from app.routes.upload import router as upload_router
+from app.services.persistence import init_db
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -36,6 +37,10 @@ def create_app() -> FastAPI:
     application.include_router(full_analysis_router)
     application.include_router(feedback_router)
     application.include_router(media_router)
+
+    @application.on_event("startup")
+    async def startup() -> None:
+        init_db()
 
     if STATIC_DIR.is_dir():
         application.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")

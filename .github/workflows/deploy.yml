@@ -72,10 +72,18 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           S3_UPLOAD_BUCKET: ${{ secrets.S3_UPLOAD_BUCKET }}
+          S3_UPLOAD_REGION: ${{ secrets.S3_UPLOAD_REGION }}
+          S3_UPLOAD_PREFIX: ${{ secrets.S3_UPLOAD_PREFIX }}
         run: |
           ENV_VARS="ELEVENLABS_API_KEY=$ELEVENLABS_API_KEY,GEMINI_API_KEY=$GEMINI_API_KEY,MINIMAX_API_KEY=$MINIMAX_API_KEY,MAX_UPLOAD_BYTES=524288000"
           if [ -n "${S3_UPLOAD_BUCKET}" ]; then
             ENV_VARS="${ENV_VARS},S3_UPLOAD_BUCKET=${S3_UPLOAD_BUCKET}"
+          fi
+          if [ -n "${S3_UPLOAD_REGION}" ]; then
+            ENV_VARS="${ENV_VARS},S3_UPLOAD_REGION=${S3_UPLOAD_REGION}"
+          fi
+          if [ -n "${S3_UPLOAD_PREFIX}" ]; then
+            ENV_VARS="${ENV_VARS},S3_UPLOAD_PREFIX=${S3_UPLOAD_PREFIX}"
           fi
           aws lambda update-function-configuration \
             --function-name "$LAMBDA_FUNCTION_NAME" \

@@ -16,6 +16,9 @@ Configure these secrets in your repository: **Settings → Secrets and variables
 | `ELEVENLABS_API_KEY` | ElevenLabs API key — used for **Speech-to-Text** (transcription) via Scribe API |
 | `GEMINI_API_KEY` | Google Gemini API key — used for **body language analysis** and **rubric evaluation**. When not set, **fallback**: uses pre-analyzed files from `body_language_analysis/` |
 | `MINIMAX_API_KEY` | Minimax API key — used for **AI teacher feedback** (Anthropic-compatible endpoint) |
+| `S3_UPLOAD_BUCKET` | S3 bucket name for direct large-file uploads (used by presigned URL flow) |
+| `S3_UPLOAD_REGION` | Region for `S3_UPLOAD_BUCKET` (e.g. `us-east-1`) |
+| `S3_UPLOAD_PREFIX` | Optional object key prefix (e.g. `uploads`) |
 
 ## Optional
 
@@ -28,8 +31,8 @@ Configure these secrets in your repository: **Settings → Secrets and variables
 
 ## How secrets are used
 
-- **Deploy workflow** (`deploy.yml`): `AWS_*` for ECR/Lambda; `ELEVENLABS_*`, `GEMINI_*`, `MINIMAX_*` are written to Lambda environment variables.
-- **Lambda runtime**: Reads `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY` from environment.
+- **Deploy workflow** (`deploy.yml`): `AWS_*` for ECR/Lambda; `ELEVENLABS_*`, `GEMINI_*`, `MINIMAX_*`, and `S3_UPLOAD_*` are written to Lambda environment variables.
+- **Lambda runtime**: Reads `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY`, and `S3_UPLOAD_*` from environment.
 
 ## Getting API keys
 

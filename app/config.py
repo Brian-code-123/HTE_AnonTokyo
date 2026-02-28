@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     temp_dir: str = tempfile.gettempdir()
     # Max video file size accepted (bytes).  Default = 500 MB.
     max_upload_bytes: int = 500 * 1024 * 1024
+    database_path: str = "/tmp/hte_anontokyo.db"
+
+    # ── Direct upload via S3 (for large files) ───────────────────────────
+    s3_upload_bucket: str = ""
+    s3_upload_region: str = "us-east-1"
+    s3_upload_prefix: str = "uploads"
+    s3_presign_expires_seconds: int = 3600
 
 
 @lru_cache
