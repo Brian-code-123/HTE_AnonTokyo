@@ -1,76 +1,91 @@
 /**
- * Voice Report Component
+ * Voice Report Component — powered by ElevenLabs TTS
  *
- * Generates a spoken audio report from transcription text using MiniMax TTS.
  * Features:
- *   - Voice selection (male/female, multiple langs)
- *   - Speed and emotion controls
- *   - Inline audio player with download
- *   - Auto-summarises long transcripts before TTS
+ *   • Direct ElevenLabs API call (frontend-only, no backend needed)
+ *   • Full audio player: play/pause, seekable progress bar, time display
+ *   • Voice selection (12 curated voices, split by gender)
+ *   • Model selection (Multilingual v2, Turbo, Monolingual)
+ *   • Speed (0.7 – 1.2×), Stability & Style sliders
+ *   • Download generated MP3
+ *   • Blob URL cleanup on unmount
  */
-import { useState, useEffect, useRef } from 'react'
-import { Volume2, Play, Pause, Download, Loader2, RefreshCw, ChevronDown } from 'lucide-react'
-import { generateTTS, getTTSVoices } from '../services/api'
-import type { TTSVoice, TTSResult, TTSEmotion } from '../types'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import {
+  Volume2, Play, Pause, Download, Loader2, RefreshCw,
+  ChevronDown, AlertCircle, Music2,
+} from 'lucide-react'
+import {
+  generateTTSDirect,
+  ELEVENLABS_VOICES,
+  ELEVENLABS_MODELS,
+  revokeAudioUrl,
+} from '../services/elevenlabsTTS'
 
 interface VoiceReportProps {
-  /** Transcript text to convert to speech (optional — user can also type) */
   transcriptText?: string
 }
 
-const EMOTIONS: { value: TTSEmotion; label: string; icon: string }[] = [
-  { value: 'neutral',   label: 'Neutral',   icon: '😐' },
-  { value: 'happy',     label: 'Happy',     icon: '😊' },
-  { value: 'sad',       label: 'Sad',       icon: '😢' },
-  { value: 'angry',     label: 'Angry',     icon: '😠' },
-  { value: 'surprised', label: 'Surprised', icon: '😲' },
-]
+function formatTime(sec: number): string {
+  if (!isFinite(sec) || sec < 0) return '0:00'
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
+}
 
 export default function VoiceReport({ transcriptText = '' }: VoiceReportProps) {
-  const [text, setText] = useState(transcriptText)
-  const [voices, setVoices] = useState<TTSVoice[]>([])
-  const [selectedVoice, setSelectedVoice] = useState('presenter_male')
-  const [speed, setSpeed] = useState(1)
-  const [emotion, setEmotion] = useState<TTSEmotion>('neutral')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [result, setResult] = useState<TTSResult | null>(null)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const [text, setText]           = useState(transcriptText)
+  const [voiceId, setVoiceId]     = useState('21m00Tcm4TlvDq8ikWAM') // Rachel
+  const [modelId, setModelId]     = useState('eleven_multilingual_v2')
+  const [speed, setSpeed]         = useState(1.0)
+  const [stability, setStability] = useState(0.5)
+  const [style, setStyle]         = useState(0.0)
+  const [loading, setLoading]     = useState(false)
+  const [error, setError]         = useState<string | null>(null)
+  const [audioUrl, setAudioUrl]   = useState<string | null>(null)
+  const [wordCount, setWordCount] = useState(0)
 
-  // Sync external transcript text
-  useEffect(() => {
-    if (transcriptText) setText(transcriptText)
-  }, [transcriptText])
+  // ── Audio player state ──────────────────────────────────────────────
+  const [isPlaying, setIsPlaying]     = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration]       = useState(0)
+  const [volume, setVolume]           = useState(1)
+  const audioRef                       = useRef<HTMLAudioElement | null>(null)
 
-  // Load voices on mount
-  useEffect(() => {
-    getTTSVoices()
-      .then(data => {
-        setVoices(data.voices)
-        if (data.voices.length > 0 && !data.voices.find(v => v.id === selectedVoice)) {
-          setSelectedVoice(data.voices[0].id)
-        }
-      })
-      .catch(() => { /* use defaults */ })
-  }, [])
+  // Sync external transcript
+  useEffect(() => { if (transcriptText) setText(transcriptText) }, [transcriptText])
 
+  // Cleanup Blob URL on unmount
+  useEffect(() => () => { if (audioUrl) revokeAudioUrl(audioUrl) }, [audioUrl])
+
+  const setupAudio = useCallback((url: string) => {
+    const audio = new Audio(url)
+    audioRef.current = audio
+    audio.volume = volume
+    audio.addEventListener('loadedmetadata', () => setDuration(audio.duration))
+    audio.addEventListener('timeupdate',     () => setCurrentTime(audio.currentTime))
+    audio.addEventListener('ended',          () => { setIsPlaying(false); setCurrentTime(0) })
+    audio.addEventListener('pause',          () => setIsPlaying(false))
+    audio.addEventListener('play',           () => setIsPlaying(true))
+  }, [volume])
+
+  // ── Generate ────────────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!text.trim()) return
     setLoading(true)
     setError(null)
-    setResult(null)
     setIsPlaying(false)
+    setCurrentTime(0)
+    setDuration(0)
+
+    if (audioUrl) { revokeAudioUrl(audioUrl); setAudioUrl(null) }
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current = null }
 
     try {
-      const res = await generateTTS({
-        text: text.slice(0, 10000),
-        voice_id: selectedVoice,
-        speed,
-        emotion,
-        language_boost: 'auto',
-      })
-      setResult(res)
+      const result = await generateTTSDirect({ text, voice_id: voiceId, model_id: modelId, speed, stability, style })
+      setAudioUrl(result.audio_url)
+      setWordCount(result.word_count)
+      setupAudio(result.audio_url)
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'TTS generation failed')
     } finally {
@@ -78,35 +93,45 @@ export default function VoiceReport({ transcriptText = '' }: VoiceReportProps) {
     }
   }
 
+  // ── Playback ────────────────────────────────────────────────────────
   const togglePlay = () => {
     const a = audioRef.current
     if (!a) return
-    if (isPlaying) {
-      a.pause()
-    } else {
-      a.play()
-    }
-    setIsPlaying(!isPlaying)
+    isPlaying ? a.pause() : a.play()
+  }
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const a = audioRef.current; if (!a) return
+    const val = parseFloat(e.target.value)
+    a.currentTime = val; setCurrentTime(val)
+  }
+
+  const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value)
+    setVolume(val)
+    if (audioRef.current) audioRef.current.volume = val
   }
 
   const handleDownload = () => {
-    if (!result?.audio_url) return
+    if (!audioUrl) return
     const a = document.createElement('a')
-    a.href = result.audio_url
-    a.download = `voice_report.${result.format || 'mp3'}`
-    a.click()
+    a.href = audioUrl; a.download = 'voice_report.mp3'; a.click()
   }
 
   const charCount = text.length
-  const charLimit = 10000
+  const charLimit = 5_000
+  const progress  = duration > 0 ? (currentTime / duration) * 100 : 0
+  const femaleVoices = ELEVENLABS_VOICES.filter(v => v.gender === 'female')
+  const maleVoices   = ELEVENLABS_VOICES.filter(v => v.gender === 'male')
 
   return (
     <div className="voice-report">
+      {/* Header */}
       <div className="vr-header">
         <div className="vr-icon"><Volume2 size={24} /></div>
         <div>
           <h2 className="vr-title">Voice Report</h2>
-          <p className="vr-subtitle">Convert text into natural speech with MiniMax AI</p>
+          <p className="vr-subtitle">Natural speech synthesis · Powered by ElevenLabs</p>
         </div>
       </div>
 
@@ -120,37 +145,45 @@ export default function VoiceReport({ transcriptText = '' }: VoiceReportProps) {
           placeholder="Paste your transcript, summary, or any text here…"
           rows={6}
           maxLength={charLimit}
+          disabled={loading}
         />
         <div className="vr-char-count">
-          <span className={charCount > charLimit * 0.9 ? 'text-warning' : ''}>
-            {charCount.toLocaleString()} / {charLimit.toLocaleString()}
+          <span className={charCount > charLimit * 0.9 ? 'vr-char-warn' : ''}>
+            {charCount.toLocaleString()} / {charLimit.toLocaleString()} chars
           </span>
         </div>
       </div>
 
       {/* Controls */}
       <div className="vr-controls">
-        {/* Voice Selector */}
+        {/* Voice */}
         <div className="vr-control-group">
           <label className="vr-label">Voice</label>
           <div className="vr-select-wrap">
-            <select
-              className="vr-select"
-              value={selectedVoice}
-              onChange={e => setSelectedVoice(e.target.value)}
-            >
-              {voices.length > 0 ? (
-                voices.map(v => (
-                  <option key={v.id} value={v.id}>{v.name} ({v.lang})</option>
-                ))
-              ) : (
-                <>
-                  <option value="presenter_male">Presenter (Male / en)</option>
-                  <option value="presenter_female">Presenter (Female / en)</option>
-                  <option value="male-qn-qingse">Qingse (Male / zh)</option>
-                  <option value="female-shaonv">Shaonv (Female / zh)</option>
-                </>
-              )}
+            <select className="vr-select" value={voiceId} onChange={e => setVoiceId(e.target.value)} disabled={loading}>
+              <optgroup label="Female">
+                {femaleVoices.map(v => (
+                  <option key={v.id} value={v.id}>{v.name} — {v.description}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Male">
+                {maleVoices.map(v => (
+                  <option key={v.id} value={v.id}>{v.name} — {v.description}</option>
+                ))}
+              </optgroup>
+            </select>
+            <ChevronDown size={16} className="vr-select-icon" />
+          </div>
+        </div>
+
+        {/* Model */}
+        <div className="vr-control-group">
+          <label className="vr-label">Model</label>
+          <div className="vr-select-wrap">
+            <select className="vr-select" value={modelId} onChange={e => setModelId(e.target.value)} disabled={loading}>
+              {ELEVENLABS_MODELS.map(m => (
+                <option key={m.id} value={m.id}>{m.label}</option>
+              ))}
             </select>
             <ChevronDown size={16} className="vr-select-icon" />
           </div>
@@ -158,75 +191,102 @@ export default function VoiceReport({ transcriptText = '' }: VoiceReportProps) {
 
         {/* Speed */}
         <div className="vr-control-group">
-          <label className="vr-label">Speed: {speed.toFixed(1)}x</label>
-          <input
-            type="range"
-            className="vr-range"
-            min={0.5}
-            max={2}
-            step={0.1}
-            value={speed}
-            onChange={e => setSpeed(parseFloat(e.target.value))}
-          />
+          <label className="vr-label">Speed — {speed.toFixed(1)}×</label>
+          <input type="range" className="vr-range" min={0.7} max={1.2} step={0.05}
+            value={speed} onChange={e => setSpeed(parseFloat(e.target.value))} disabled={loading} />
+          <div className="vr-range-labels"><span>0.7×</span><span>1.0×</span><span>1.2×</span></div>
         </div>
 
-        {/* Emotion */}
+        {/* Stability */}
         <div className="vr-control-group">
-          <label className="vr-label">Emotion</label>
-          <div className="vr-emotion-chips">
-            {EMOTIONS.map(em => (
-              <button
-                key={em.value}
-                className={`vr-chip ${emotion === em.value ? 'active' : ''}`}
-                onClick={() => setEmotion(em.value)}
-              >
-                {em.icon} {em.label}
-              </button>
-            ))}
-          </div>
+          <label className="vr-label">Stability — {Math.round(stability * 100)}%</label>
+          <input type="range" className="vr-range" min={0} max={1} step={0.05}
+            value={stability} onChange={e => setStability(parseFloat(e.target.value))} disabled={loading} />
+          <div className="vr-range-labels"><span>Expressive</span><span></span><span>Consistent</span></div>
+        </div>
+
+        {/* Style exaggeration */}
+        <div className="vr-control-group">
+          <label className="vr-label">Style — {Math.round(style * 100)}%</label>
+          <input type="range" className="vr-range" min={0} max={1} step={0.05}
+            value={style} onChange={e => setStyle(parseFloat(e.target.value))} disabled={loading} />
+          <div className="vr-range-labels"><span>Neutral</span><span></span><span>Exaggerated</span></div>
         </div>
       </div>
 
-      {/* Generate Button */}
-      <button
-        className="vr-generate-btn"
-        onClick={handleGenerate}
-        disabled={loading || !text.trim()}
-      >
-        {loading ? (
-          <><Loader2 size={18} className="spin" /> Generating…</>
-        ) : result ? (
-          <><RefreshCw size={18} /> Regenerate</>
-        ) : (
-          <><Volume2 size={18} /> Generate Voice Report</>
+      {/* Generate button row */}
+      <div className="vr-generate-row">
+        <button className="vr-generate-btn" onClick={handleGenerate} disabled={loading || !text.trim()}>
+          {loading
+            ? <><Loader2 size={18} className="vr-spin" /> Generating speech…</>
+            : audioUrl
+              ? <><RefreshCw size={18} /> Regenerate</>
+              : <><Volume2 size={18} /> Generate Voice Report</>}
+        </button>
+        {audioUrl && !loading && (
+          <button className="vr-dl-btn-standalone" onClick={handleDownload}>
+            <Download size={16} /> Download MP3
+          </button>
         )}
-      </button>
+      </div>
 
       {/* Error */}
-      {error && <div className="vr-error">{error}</div>}
+      {error && (
+        <div className="vr-error-banner">
+          <AlertCircle size={16} /><span>{error}</span>
+        </div>
+      )}
+
+      {/* Loading shimmer */}
+      {loading && (
+        <div className="vr-loading-card glass-card">
+          <Music2 size={28} className="vr-loading-icon" />
+          <div>
+            <p className="vr-loading-title">Synthesising speech…</p>
+            <p className="vr-loading-sub">ElevenLabs · usually 3 – 10 s</p>
+          </div>
+        </div>
+      )}
 
       {/* Audio Player */}
-      {result?.audio_url && (
+      {audioUrl && !loading && (
         <div className="vr-player glass-card">
-          <audio
-            ref={audioRef}
-            src={result.audio_url}
-            onEnded={() => setIsPlaying(false)}
-            onPause={() => setIsPlaying(false)}
-            onPlay={() => setIsPlaying(true)}
-          />
-          <button className="vr-play-btn" onClick={togglePlay}>
-            {isPlaying ? <Pause size={20} /> : <Play size={20} />}
-          </button>
-          <div className="vr-player-info">
-            <span className="vr-player-label">Voice Report Ready</span>
-            <span className="vr-player-meta">
-              {result.word_count} words · {(result.duration_ms / 1000).toFixed(1)}s · {result.format.toUpperCase()}
+          {/* Meta */}
+          <div className="vr-player-meta-row">
+            <span className="vr-player-badge"><Music2 size={14} /> Voice Report Ready</span>
+            <span className="vr-player-stats">
+              {wordCount > 0 && `${wordCount} words · `}
+              {duration > 0 && `${duration.toFixed(1)} s · `}
+              MP3
             </span>
           </div>
-          <button className="vr-dl-btn" onClick={handleDownload} title="Download audio">
-            <Download size={18} />
-          </button>
+
+          {/* Seek bar */}
+          <div className="vr-seek-area">
+            <span className="vr-time">{formatTime(currentTime)}</span>
+            <div className="vr-seek-track">
+              <div className="vr-seek-fill" style={{ width: `${progress}%` }} />
+              <input type="range" className="vr-seek-input"
+                min={0} max={duration || 1} step={0.01}
+                value={currentTime} onChange={handleSeek} />
+            </div>
+            <span className="vr-time">{formatTime(duration)}</span>
+          </div>
+
+          {/* Controls */}
+          <div className="vr-player-controls">
+            <button className="vr-play-btn" onClick={togglePlay} aria-label={isPlaying ? 'Pause' : 'Play'}>
+              {isPlaying ? <Pause size={20} /> : <Play size={20} />}
+            </button>
+            <div className="vr-volume-row">
+              <Volume2 size={14} className="vr-vol-icon" />
+              <input type="range" className="vr-range vr-volume-range"
+                min={0} max={1} step={0.05} value={volume} onChange={handleVolumeChange} />
+            </div>
+            <button className="vr-dl-btn" onClick={handleDownload} title="Download MP3">
+              <Download size={18} />
+            </button>
+          </div>
         </div>
       )}
     </div>

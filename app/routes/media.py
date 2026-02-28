@@ -135,7 +135,81 @@ def get_tts_voices() -> TTSVoicesResponse:
     return TTSVoicesResponse(voices=DEFAULT_VOICES, emotions=DEFAULT_EMOTIONS)
 
 
-@router.post("/api/video/generate", response_model=VideoGenerateResponse)
+# ── ElevenLabs TTS ─────────────────────────────────────────────────────────
+
+@router.post("/api/elevenlabs/tts")
+def generate_elevenlabs_tts(body: ElevenLabsTTSRequest) -> Response:
+    """Proxy ElevenLabs TTS server-side — avoids CORS and keeps the API key
+    out of the browser bundle.
+    Returns raw MP3 audio bytes with Content-Type: audio/mpeg.
+    """
+    settings = get_settings()
+    api_key = settings.elevenlabs_api_key
+    if not api_key:
+        raise HTTPException(
+            status_code=500,
+            detail="ELEVENLABS_API_KEY not configured in backend .env",
+        )
+
+    if not body.text.strip():
+        raise HTTPException(status_code=400, detail="Text must not be empty")
+
+    payload = {
+        "text": body.text[:5_000],
+        "model_id": body.model_id,
+        "voice_settings": {
+            "stability":        max(0.0, min(1.0, body.stability)),
+            "similarity_boost": max(0.0, min(1.0, body.similarity_boost)),
+            "style":            max(0.0, min(1.0, body.style)),
+            "use_speaker_boost": True,
+            "speed":            max(0.7, min(1.2, body.speed)),
+        },
+    }
+
+    try:
+        resp = requests.post(
+            f"{ELEVENLABS_TTS_URL}/{body.voice_id}",
+            headers={
+                "xi-api-key":   api_key,
+                "Content-Type": "application/json",
+                "Accept":       "audio/mpeg",
+            },
+            json=payload,
+            timeout=ELEVENLABS_TIMEOUT,
+        )
+    except requests.RequestException as exc:
+        logger.error("ElevenLabs TTS request failed: %s", exc)
+        raise HTTPException(status_code=502, detail=f"ElevenLabs TTS request failed: {exc}")
+
+    if not resp.ok:
+        # Try to extract a helpful error message
+        try:
+            err = resp.json()
+            detail = err.get("detail", {})
+            if isinstance(detail, dict):
+                status_code = detail.get("status", "")
+                msg = detail.get("message", str(detail))
+                if status_code == "missing_permissions":
+                    msg = (
+                        "ElevenLabs API key is missing the 'text_to_speech' permission. "
+                        "Fix it at: elevenlabs.io \u2192 Profile \u2192 API Keys \u2192 Edit key \u2192 enable Text to Speech."
+                    )
+            else:
+                msg = str(detail) or resp.text[:300]
+        except Exception:
+            msg = resp.text[:300] or f"HTTP {resp.status_code}"
+
+        logger.error("ElevenLabs TTS error %s: %s", resp.status_code, msg)
+        raise HTTPException(status_code=resp.status_code, detail=msg)
+
+    # Success — stream raw MP3 bytes back to the browser
+    return Response(
+        content=resp.content,
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": 'inline; filename="voice_report.mp3"'},
+    )
+
+
 def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
     settings = get_settings()
     if not settings.minimax_api_key:

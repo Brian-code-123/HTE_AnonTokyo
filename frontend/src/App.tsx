@@ -19,6 +19,7 @@ import VideoGenerator from './components/VideoGenerator'
 import AnalysisResultView from './components/AnalysisResultView'
 import FeedbackTab from './components/FeedbackTab'
 import AssistantWidget from './components/AssistantWidget'
+import Footer from './components/Footer'
 import { transcribeFile, transcribeYoutube, fullAnalysisFile, fullAnalysisYoutube } from './services/api'
 import type { AppTab, AnalysisMode, InputMode, ProgressState, TranscriptResult, FullAnalysisResult } from './types'
 
@@ -216,9 +217,7 @@ export default function App() {
         {activeTab === 'feedback' && <FeedbackTab />}
       </main>
 
-      <footer className="footer">
-        VoiceTrace — HTE AnonTokyo &nbsp;·&nbsp; Powered by MiniMax &nbsp;·&nbsp; {new Date().getFullYear()}
-      </footer>
+      <Footer onNavigate={setActiveTab} />
 
       {/* ── Floating AI Assistant ──────────────────────────────────────── */}
       <AssistantWidget />
