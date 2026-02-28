@@ -1,18 +1,6 @@
 {
-  "buildCommand": "cd frontend && npm run build",
+  "buildCommand": "cd frontend && npm install && npm run build",
   "outputDirectory": "frontend/dist",
-  "framework": "vite",
-  "env": {
-    "ASI_ONE_API_KEY": "@asi_one_api_key",
-    "ELEVENLABS_API_KEY": "@elevenlabs_api_key",
-    "GEMINI_API_KEY": "@gemini_api_key",
-    "MINIMAX_API_KEY": "@minimax_api_key",
-    "AWS_ACCESS_KEY_ID": "@aws_access_key_id",
-    "AWS_SECRET_ACCESS_KEY": "@aws_secret_access_key",
-    "S3_UPLOAD_BUCKET": "@s3_upload_bucket",
-    "DYNAMODB_TABLE_NAME": "@dynamodb_table_name",
-    "PYTHON_VERSION": "3.12"
-  },
   "functions": {
     "api/index.py": {
       "memory": 3008,
@@ -22,13 +10,12 @@
   },
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api"
+      "source": "/api/:path*",
+      "destination": "/api/index.py"
     },
     {
-      "source": "/(.*)",
+      "source": "/:path*",
       "destination": "/index.html"
     }
-  ],
-  "buildOutputDirectory": "frontend/dist"
+  ]
 }
