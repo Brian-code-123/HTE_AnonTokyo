@@ -25,7 +25,7 @@ const QUICK_SUGGESTIONS = [
 ]
 
 const WELCOME_TEXT =
-  "👋 Hi! I'm your VoiceTrace AI guide — powered by **ASI One**.\n\nAsk me anything about the platform, teaching strategies, or how to get the most from your analyses!"
+  "👋 Hi! I'm your **MentorMirror** AI guide — powered by **ASI One**.\n\nAsk me anything about the platform, teaching strategies, or how to get the most from your analyses!"
 
 export default function AssistantWidget() {
   const [open, setOpen]         = useState(false)
@@ -101,7 +101,7 @@ export default function AssistantWidget() {
           <div className="assistant-header">
             <span className="assistant-header-title">
               <Bot size={16} />
-              VoiceTrace Guide
+              MentorMirror Guide
               <span className="assistant-badge-asi">
                 <Sparkles size={10} />
                 ASI One
@@ -155,7 +155,7 @@ export default function AssistantWidget() {
             <input
               className="assistant-input"
               type="text"
-              placeholder="Ask anything about VoiceTrace…"
+              placeholder="Ask anything about MentorMirror…"
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKey}
@@ -175,7 +175,7 @@ export default function AssistantWidget() {
 
       {/* FAB */}
       <button
-        className={`assistant-fab ${open ? 'open' : ''}`}
+        className={`assistant-fab ${open ? 'open' : 'pulse-glow'}`}
         onClick={() => setOpen(v => !v)}
         aria-label="Toggle assistant"
       >

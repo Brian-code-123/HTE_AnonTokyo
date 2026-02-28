@@ -1,7 +1,7 @@
 /**
  * Application Type Definitions
  * 
- * Core types used throughout the VoiceTrace application for type safety
+ * Core types used throughout the MentorMirror application for type safety
  */
 
 /** UI theme setting */

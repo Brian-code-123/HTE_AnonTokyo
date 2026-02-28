@@ -22,6 +22,7 @@ import ComparisonView from './ComparisonView'
 import AICoaching from './AICoaching'
 import { transcribeFile, transcribeYoutube, fullAnalysisFile, fullAnalysisYoutube, seedDemoData } from '../services/api'
 import type { AnalysisMode, InputMode, ProgressState, TranscriptResult, FullAnalysisResult } from '../types'
+import { useScrollRevealGroup } from '../hooks/useAnimations'
 
 interface ForYouPageProps {
   initialTool?: ForYouTool | null
@@ -357,9 +358,11 @@ export default function ForYouPage({ initialTool = null, onToolChange }: ForYouP
   }
 
   // ── Main tools grid ──
+  const cardsRef = useScrollRevealGroup<HTMLDivElement>()
+
   return (
-    <div className="for-you-page">
-      <section className="hero compact">
+    <div className="for-you-page" ref={cardsRef}>
+      <section className="hero compact reveal">
         <div className="hero-eyebrow"><Sparkles size={14} /> Personalised Toolkit</div>
         <h1>For You</h1>
         <p className="hero-desc">
@@ -369,7 +372,7 @@ export default function ForYouPage({ initialTool = null, onToolChange }: ForYouP
       </section>
 
       {TOOL_CATEGORIES.map(category => (
-        <div key={category.title} className="for-you-category">
+        <div key={category.title} className="for-you-category reveal">
           <div className="for-you-category-header">
             <h2 className="for-you-category-title">{category.title}</h2>
             <p className="for-you-category-desc">{category.description}</p>

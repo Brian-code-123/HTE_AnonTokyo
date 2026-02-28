@@ -1,21 +1,21 @@
 /**
  * Application Header Component
  *
- * Displays the VoiceTrace branding, nav tabs, and theme toggle.
+ * Displays the MentorMirror branding, nav tabs, and theme toggle.
  * "For You" shows a NeoTrace-style dropdown mega-menu on hover.
  */
 import { useState, useRef, useEffect } from 'react'
 import {
-  Mic, Sun, Moon, LayoutDashboard, Sparkles, MessageSquare,
+  GraduationCap, Sun, Moon, LayoutDashboard, Sparkles, MessageSquare,
   Volume2, Clapperboard, BookOpen, TrendingUp, GitCompareArrows,
-  Brain, ChevronDown,
+  Brain, ChevronDown, Mic,
 } from 'lucide-react'
 import type { Theme, AppTab, ForYouTool } from '../types'
 
 interface ForYouColumn {
   heading: string
-  icon: typeof Mic
-  items: { id: ForYouTool; label: string; icon: typeof Mic }[]
+  icon: typeof GraduationCap
+  items: { id: ForYouTool; label: string; icon: typeof GraduationCap }[]
 }
 
 const FOR_YOU_COLUMNS: ForYouColumn[] = [
@@ -88,10 +88,10 @@ export default function Header({ theme, onToggle, activeTab, onTabChange, onForY
     <header className="header">
       {/* Brand */}
       <div className="header-brand">
-        <div className="header-logo"><Mic /></div>
+        <div className="header-logo float-anim"><GraduationCap /></div>
         <div>
-          <div className="header-title">VoiceTrace</div>
-          <div className="header-subtitle">AI Transcription</div>
+          <div className="header-title">MentorMirror</div>
+          <div className="header-subtitle">AI Teaching Coach</div>
         </div>
       </div>
 

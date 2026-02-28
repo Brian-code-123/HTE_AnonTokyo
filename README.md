@@ -1,4 +1,4 @@
-# VoiceTrace: AI-Powered Teaching Performance Analyzer
+# MentorMirror: AI-Powered Teaching Performance Analyzer
 
 **Understand what teachers care about. Pick actionable insights. Explain what matters. Deliver real improvements.**
 
@@ -6,7 +6,7 @@
 
 ## 🎯 Overview
 
-VoiceTrace is a comprehensive **AI-driven teaching evaluation platform** that helps educators analyze classroom video recordings and receive data-backed feedback for continuous improvement. Using advanced speech recognition, body language analysis, and language models, it provides **objective, actionable insights** rather than subjective opinions.
+MentorMirror is a comprehensive **AI-driven teaching evaluation platform** that helps educators analyze classroom video recordings and receive data-backed feedback for continuous improvement. Using advanced speech recognition, body language analysis, and language models, it provides **objective, actionable insights** rather than subjective opinions.
 
 ### The Promise: **Do What You Promised**
 

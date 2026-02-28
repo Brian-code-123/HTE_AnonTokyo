@@ -1,4 +1,5 @@
 from pathlib import Path
+import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -21,11 +22,12 @@ from app.routes.chat import router as chat_router
 from app.services.persistence import init_db
 
 STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+IS_VERCEL = os.getenv("VERCEL") == "1"
 
 
 def create_app() -> FastAPI:
     application = FastAPI(
-        title="Teacher Performance Dashboard API",
+        title="MentorMirror — AI Teaching Coach API",
         version="0.1.0",
         description="Analyse classroom video recordings — transcription, body language, and rubric evaluation.",
     )
@@ -56,7 +58,8 @@ def create_app() -> FastAPI:
     async def startup() -> None:
         init_db()
 
-    if STATIC_DIR.is_dir():
+    # Only serve SPA in development (on Vercel, frontend is served separately)
+    if not IS_VERCEL and STATIC_DIR.is_dir():
         application.mount("/assets", StaticFiles(directory=str(STATIC_DIR / "assets")), name="assets")
 
         @application.get("/{full_path:path}")

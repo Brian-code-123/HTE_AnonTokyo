@@ -1,5 +1,6 @@
 import tempfile
 from functools import lru_cache
+import os
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -12,7 +13,7 @@ class Settings(BaseSettings):
     )
 
     # ── ASI One AI Agent ────────────────────────────────────────────────────
-    asi_one_api_key: str = "sk_3f44f0d5f4d44c04ba0646b1075ff7255cf5f55aa7b5496281945617e5b65187"
+    asi_one_api_key: str = ""  # REQUIRED: Set via environment variable
 
     # ── ElevenLabs Speech-to-Text (Scribe API) ───────────────────────────
     elevenlabs_api_key: str = ""
@@ -38,7 +39,7 @@ class Settings(BaseSettings):
     temp_dir: str = tempfile.gettempdir()
     # Max video file size accepted (bytes).  Default = 500 MB.
     max_upload_bytes: int = 500 * 1024 * 1024
-    database_path: str = "/tmp/hte_anontokyo.db"
+    database_path: str = os.getenv("DATABASE_PATH", "/tmp/mentormirror.db")
 
     # ── Direct upload via S3 (for large files) ───────────────────────────
     s3_upload_bucket: str = ""

@@ -1,5 +1,5 @@
 /**
- * VoiceTrace Main Application Component
+ * MentorMirror Main Application Component
  * 
  * Core application component that orchestrates:
  * - Dashboard overview
@@ -46,17 +46,25 @@ export default function App() {
 
       <main className="main-content">
         {activeTab === 'dashboard' && (
-          <Dashboard onNavigate={(tab) => handleTabChange(tab as AppTab)} />
+          <div key="dashboard" className="tab-panel">
+            <Dashboard onNavigate={(tab) => handleTabChange(tab as AppTab)} />
+          </div>
         )}
 
         {activeTab === 'for-you' && (
-          <ForYouPage
-            initialTool={forYouTool}
-            onToolChange={setForYouTool}
-          />
+          <div key="for-you" className="tab-panel">
+            <ForYouPage
+              initialTool={forYouTool}
+              onToolChange={setForYouTool}
+            />
+          </div>
         )}
 
-        {activeTab === 'feedback' && <FeedbackTab />}
+        {activeTab === 'feedback' && (
+          <div key="feedback" className="tab-panel">
+            <FeedbackTab />
+          </div>
+        )}
       </main>
 
       <Footer onNavigate={handleTabChange} />

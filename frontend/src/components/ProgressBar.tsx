@@ -44,7 +44,7 @@ export default function ProgressBar({ progress }: ProgressBarProps) {
   if (status === 'idle') return null
 
   return (
-    <div className="glass-card progress-section">
+    <div className="glass-card progress-section progress-animated">
       {status === 'error' ? (
         <div className="error-banner">
           <AlertCircle />

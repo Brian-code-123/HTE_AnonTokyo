@@ -1,5 +1,5 @@
 import {
-  Mic, Github, ArrowUp, Lock,
+  GraduationCap, Github, ArrowUp, Lock,
   LayoutDashboard, Sparkles, MessageSquare,
 } from 'lucide-react'
 import type { AppTab } from '../types'
@@ -23,11 +23,11 @@ export default function Footer({ onNavigate }: FooterProps) {
         {/* ── Brand ────────────────────────────────────────────── */}
         <div className="footer-col footer-brand-col">
           <div className="footer-logo">
-            <Mic size={22} />
-            <span className="footer-logo-text">VoiceTrace</span>
+            <GraduationCap size={22} />
+            <span className="footer-logo-text">MentorMirror</span>
           </div>
           <p className="footer-tagline">
-            AI-powered speech transcription, body language analysis &amp; teaching evaluation.
+            AI-powered classroom coaching, body language analysis &amp; teaching evaluation.
           </p>
           <div className="footer-badge">
             <Lock size={12} />
@@ -71,7 +71,7 @@ export default function Footer({ onNavigate }: FooterProps) {
       {/* ── Bottom bar ────────────────────────────────────────── */}
       <div className="footer-bottom">
         <span className="footer-copy">
-          &copy; {new Date().getFullYear()} VoiceTrace — HTE AnonTokyo
+          &copy; {new Date().getFullYear()} MentorMirror — HTE AnonTokyo
         </span>
         <button className="footer-back-top" onClick={scrollToTop}>
           Back to Top <ArrowUp size={14} />

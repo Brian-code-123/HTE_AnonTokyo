@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import type { DashboardData, HistoryData, HistoryEvent } from '../types'
 import { fetchDashboard, fetchHistory } from '../services/api'
+import { useScrollRevealGroup, useAnimatedCounter } from '../hooks/useAnimations'
 
 interface Props {
   onNavigate: (tab: string) => void
@@ -89,6 +90,15 @@ export default function Dashboard({ onNavigate }: Props) {
     return Array.from(new Set(history.events.map(e => e.event_type))).sort()
   }, [history])
 
+  /* ── animation hooks ──────────────────────────── */
+  const statsRef = useScrollRevealGroup<HTMLDivElement>()
+  const panelsRef = useScrollRevealGroup<HTMLDivElement>()
+  const bottomRef = useScrollRevealGroup<HTMLDivElement>()
+  const hasData = !!data
+  const transCount = useAnimatedCounter(data?.stats.transcriptions ?? 0, 1000, hasData)
+  const analysisCount = useAnimatedCounter(data?.stats.full_analyses ?? 0, 1000, hasData)
+  const feedbackCount = useAnimatedCounter(data?.stats.feedback_generated ?? 0, 1000, hasData)
+
   return (
     <div className="dashboard">
       {/* ── Header row ─────────────────────────────────────────── */}
@@ -128,38 +138,38 @@ export default function Dashboard({ onNavigate }: Props) {
       )}
 
       {/* ── Stats row ──────────────────────────────────────────── */}
-      <div className="db-stats-grid">
-        <div className="db-stat-card">
+      <div className="db-stats-grid stagger-parent" ref={statsRef}>
+        <div className="db-stat-card reveal">
           <div className="db-stat-icon" style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1' }}>
             <Mic size={20} />
           </div>
           <div className="db-stat-body">
-            <span className="db-stat-value">{data?.stats.transcriptions ?? '—'}</span>
+            <span className="db-stat-value animated-number">{hasData ? transCount : '—'}</span>
             <span className="db-stat-label">Transcriptions</span>
           </div>
         </div>
 
-        <div className="db-stat-card">
+        <div className="db-stat-card reveal">
           <div className="db-stat-icon" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
             <ClipboardList size={20} />
           </div>
           <div className="db-stat-body">
-            <span className="db-stat-value">{data?.stats.full_analyses ?? '—'}</span>
+            <span className="db-stat-value animated-number">{hasData ? analysisCount : '—'}</span>
             <span className="db-stat-label">Full Analyses</span>
           </div>
         </div>
 
-        <div className="db-stat-card">
+        <div className="db-stat-card reveal">
           <div className="db-stat-icon" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}>
             <MessageSquare size={20} />
           </div>
           <div className="db-stat-body">
-            <span className="db-stat-value">{data?.stats.feedback_generated ?? '—'}</span>
+            <span className="db-stat-value animated-number">{hasData ? feedbackCount : '—'}</span>
             <span className="db-stat-label">Feedback Reports</span>
           </div>
         </div>
 
-        <div className="db-stat-card">
+        <div className="db-stat-card reveal">
           <div className="db-stat-icon" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>
             <Clock size={20} />
           </div>
@@ -172,9 +182,9 @@ export default function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      <div className="db-two-col">
+      <div className="db-two-col stagger-parent" ref={panelsRef}>
         {/* ── Services ─────────────────────────────────────────── */}
-        <div className="glass-card db-panel">
+        <div className="glass-card db-panel reveal">
           <h3 className="db-panel-title">
             <Cpu size={16} /> Services
             <span className={`db-service-summary ${configuredCount === totalServices ? 'all-ok' : 'partial'}`}>
@@ -213,7 +223,7 @@ export default function Dashboard({ onNavigate }: Props) {
         </div>
 
         {/* ── Capabilities ─────────────────────────────────────── */}
-        <div className="glass-card db-panel">
+        <div className="glass-card db-panel reveal">
           <h3 className="db-panel-title">
             <Activity size={16} /> Active Capabilities
           </h3>
@@ -259,8 +269,8 @@ export default function Dashboard({ onNavigate }: Props) {
         </div>
       </div>
 
-      <div className="db-two-col" style={{ marginTop: '1rem' }}>
-        <div className="glass-card db-panel">
+      <div className="db-two-col stagger-parent" ref={bottomRef} style={{ marginTop: '1rem' }}>
+        <div className="glass-card db-panel reveal">
           <h3 className="db-panel-title">
             <Database size={16} /> Previous Generations & Analytics
             <span className="db-service-summary all-ok">{history?.total ?? 0} records</span>
@@ -324,7 +334,7 @@ export default function Dashboard({ onNavigate }: Props) {
           </div>
         </div>
 
-        <div className="glass-card db-panel">
+        <div className="glass-card db-panel reveal">
           <h3 className="db-panel-title">
             <Activity size={16} /> Event Details
           </h3>
