@@ -1,0 +1,12 @@
+# Minimal requirements for Vercel serverless deployment
+# Vercel uses this api/requirements.txt instead of the root one for functions in api/
+# Stripped of packages that don't work in serverless (no ffmpeg binary, no uvicorn needed, etc.)
+
+fastapi
+mangum>=0.17.0
+pydantic-settings
+python-dotenv
+requests>=2.31.0
+python-multipart
+google-genai>=1.0.0
+anthropic>=0.30.0
