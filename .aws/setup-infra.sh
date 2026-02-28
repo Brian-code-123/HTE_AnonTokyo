@@ -72,17 +72,17 @@ if ! aws s3api head-bucket --bucket "$S3_UPLOAD_BUCKET" >/dev/null 2>&1; then
   fi
 fi
 
-# ── 2b. CORS on S3 so CloudFront/frontend can load presigned video URLs ─────────
-echo "2b) Setting CORS on upload bucket (allow GET/HEAD from any origin)"
+# ── 2b. CORS on S3: presigned PUT (upload) + GET (playback) from browser ───────
+echo "2b) Setting CORS on upload bucket (allow PUT/GET/HEAD from any origin)"
 CORS_FILE="$(mktemp)"
 cat > "$CORS_FILE" <<'CORSJSON'
 {
   "CORSRules": [
     {
       "AllowedHeaders": ["*"],
-      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
       "AllowedOrigins": ["*"],
-      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"]
+      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
     }
   ]
 }

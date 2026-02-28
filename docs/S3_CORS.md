@@ -1,6 +1,6 @@
 # S3 CORS for uploads bucket
 
-The frontend (e.g. served from CloudFront) loads video URLs from the uploads S3 bucket via **presigned URLs**. Browsers enforce CORS: the bucket must respond with `Access-Control-Allow-Origin` or the request is blocked.
+The frontend (e.g. served from CloudFront) uses the uploads S3 bucket in two ways: **PUT** to a presigned URL (upload) and **GET** (playback). Browsers enforce CORS: the bucket must respond with `Access-Control-Allow-Origin` and allow the right methods (PUT, GET, HEAD) or the request is blocked.
 
 ## One-time fix (existing bucket)
 
@@ -11,7 +11,7 @@ Access to XMLHttpRequest at 'https://...s3.amazonaws.com/...' from origin 'https
 has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present
 ```
 
-apply CORS to your upload bucket once:
+apply CORS to your upload bucket once. The config must allow **PUT** (presigned upload from the browser) and **GET**/**HEAD** (playback):
 
 ```bash
 # Replace BUCKET_NAME with your bucket (e.g. hte-anontokyo-uploads-675177356722)
@@ -19,9 +19,9 @@ aws s3api put-bucket-cors --bucket BUCKET_NAME --cors-configuration '{
   "CORSRules": [
     {
       "AllowedHeaders": ["*"],
-      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
       "AllowedOrigins": ["*"],
-      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"]
+      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
     }
   ]
 }'
@@ -34,9 +34,9 @@ aws s3api put-bucket-cors --bucket hte-anontokyo-uploads-675177356722 --cors-con
   "CORSRules": [
     {
       "AllowedHeaders": ["*"],
-      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedMethods": ["GET", "HEAD", "PUT"],
       "AllowedOrigins": ["*"],
-      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"]
+      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges", "ETag"]
     }
   ]
 }'
