@@ -19,6 +19,8 @@ Configure these secrets in your repository: **Settings → Secrets and variables
 | `S3_UPLOAD_BUCKET` | S3 bucket name for direct large-file uploads (used by presigned URL flow) |
 | `S3_UPLOAD_REGION` | Region for `S3_UPLOAD_BUCKET` (e.g. `us-east-1`) |
 | `S3_UPLOAD_PREFIX` | Optional object key prefix (e.g. `uploads`) |
+| `DDB_TABLE_NAME` | DynamoDB table for persistent generation history (recommended in Lambda) |
+| `DDB_REGION` | Region for `DDB_TABLE_NAME` (e.g. `us-east-1`) |
 
 ## Optional
 
@@ -31,8 +33,8 @@ Configure these secrets in your repository: **Settings → Secrets and variables
 
 ## How secrets are used
 
-- **Deploy workflow** (`deploy.yml`): `AWS_*` for ECR/Lambda; `ELEVENLABS_*`, `GEMINI_*`, `MINIMAX_*`, and `S3_UPLOAD_*` are written to Lambda environment variables.
-- **Lambda runtime**: Reads `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY`, and `S3_UPLOAD_*` from environment.
+- **Deploy workflow** (`deploy.yml`): `AWS_*` for ECR/Lambda; `ELEVENLABS_*`, `GEMINI_*`, `MINIMAX_*`, `S3_UPLOAD_*`, and `DDB_*` are written to Lambda environment variables.
+- **Lambda runtime**: Reads `ELEVENLABS_API_KEY`, `GEMINI_API_KEY`, `MINIMAX_API_KEY`, `S3_UPLOAD_*`, and `DDB_*` from environment.
 
 ## Getting API keys
 

@@ -12,6 +12,7 @@ ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${LAMBDA_ROLE_NAME}"
 LOG_GROUP="/aws/lambda/${LAMBDA_FUNCTION_NAME}"
 S3_UPLOAD_BUCKET="${S3_UPLOAD_BUCKET:-${APP_NAME}-uploads-${ACCOUNT_ID}}"
+DDB_TABLE_NAME="${DDB_TABLE_NAME:-${APP_NAME}-events}"
 
 echo "=== HTE AnonTokyo Lambda + CloudFront Setup ==="
 echo "Region: $REGION | Account: $ACCOUNT_ID"
@@ -60,6 +61,21 @@ aws iam put-role-policy \
     ]
   }" >/dev/null
 
+echo "1c) Ensuring IAM policy allows DynamoDB event persistence"
+aws iam put-role-policy \
+  --role-name "$LAMBDA_ROLE_NAME" \
+  --policy-name "${APP_NAME}-ddb-events-access" \
+  --policy-document "{
+    \"Version\": \"2012-10-17\",
+    \"Statement\": [
+      {
+        \"Effect\": \"Allow\",
+        \"Action\": [\"dynamodb:PutItem\", \"dynamodb:Scan\", \"dynamodb:Query\", \"dynamodb:DescribeTable\"],
+        \"Resource\": \"arn:aws:dynamodb:${REGION}:${ACCOUNT_ID}:table/${DDB_TABLE_NAME}\"
+      }
+    ]
+  }" >/dev/null
+
 # ── 2. Ensure S3 bucket + CloudWatch log group exists ────────────────────────
 echo "2) Ensuring upload bucket exists: ${S3_UPLOAD_BUCKET}"
 if ! aws s3api head-bucket --bucket "$S3_UPLOAD_BUCKET" >/dev/null 2>&1; then
@@ -90,7 +106,18 @@ CORSJSON
 aws s3api put-bucket-cors --bucket "$S3_UPLOAD_BUCKET" --cors-configuration "file://${CORS_FILE}" 2>/dev/null || true
 rm -f "$CORS_FILE"
 
-echo "2c) Ensuring log group exists: ${LOG_GROUP}"
+echo "2c) Ensuring DynamoDB table exists: ${DDB_TABLE_NAME}"
+if ! aws dynamodb describe-table --table-name "$DDB_TABLE_NAME" --region "$REGION" >/dev/null 2>&1; then
+  aws dynamodb create-table \
+    --table-name "$DDB_TABLE_NAME" \
+    --attribute-definitions AttributeName=id,AttributeType=S \
+    --key-schema AttributeName=id,KeyType=HASH \
+    --billing-mode PAY_PER_REQUEST \
+    --region "$REGION" >/dev/null
+  aws dynamodb wait table-exists --table-name "$DDB_TABLE_NAME" --region "$REGION"
+fi
+
+echo "2d) Ensuring log group exists: ${LOG_GROUP}"
 if ! aws logs describe-log-groups \
   --region "$REGION" \
   --log-group-name-prefix "$LOG_GROUP" \
@@ -248,4 +275,5 @@ echo "  MINIMAX_API_KEY        - Minimax API key (AI feedback)"
 echo "  S3_UPLOAD_BUCKET       - S3 bucket for large direct uploads (default: ${S3_UPLOAD_BUCKET})"
 echo "  S3_UPLOAD_REGION       - S3 bucket region (default: ${REGION})"
 echo "  S3_UPLOAD_PREFIX       - Object prefix, e.g. uploads"
+echo "  DDB_TABLE_NAME         - DynamoDB table for generation history (default: ${DDB_TABLE_NAME})"
 echo "  CLOUDFRONT_DISTRIBUTION_ID = ${DIST_ID}"

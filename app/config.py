@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     s3_upload_prefix: str = "uploads"
     s3_presign_expires_seconds: int = 3600
 
+    # ── Persistence backend (use DynamoDB in Lambda for cross-instance history) ──
+    dynamodb_table_name: str = ""
+    dynamodb_region: str = "us-east-1"
+
 
 @lru_cache
 def get_settings() -> Settings:
