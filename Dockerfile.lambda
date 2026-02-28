@@ -25,7 +25,6 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app/ ./app/
-COPY body_language_analysis/ ./body_language_analysis/
 COPY --from=frontend-build /build/dist ./static
 
 # Mangum handler entrypoint
