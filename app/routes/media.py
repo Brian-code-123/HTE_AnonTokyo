@@ -225,6 +225,7 @@ def generate_elevenlabs_tts(body: ElevenLabsTTSRequest) -> Response:
     )
 
 
+@router.post("/api/video/generate", response_model=VideoGenerateResponse)
 def generate_video(body: VideoGenerateRequest) -> VideoGenerateResponse:
     settings = get_settings()
     if not settings.minimax_api_key:
