@@ -72,7 +72,25 @@ if ! aws s3api head-bucket --bucket "$S3_UPLOAD_BUCKET" >/dev/null 2>&1; then
   fi
 fi
 
-echo "2b) Ensuring log group exists: ${LOG_GROUP}"
+# ── 2b. CORS on S3 so CloudFront/frontend can load presigned video URLs ─────────
+echo "2b) Setting CORS on upload bucket (allow GET/HEAD from any origin)"
+CORS_FILE="$(mktemp)"
+cat > "$CORS_FILE" <<'CORSJSON'
+{
+  "CORSRules": [
+    {
+      "AllowedHeaders": ["*"],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedOrigins": ["*"],
+      "ExposeHeaders": ["Content-Length", "Content-Range", "Accept-Ranges"]
+    }
+  ]
+}
+CORSJSON
+aws s3api put-bucket-cors --bucket "$S3_UPLOAD_BUCKET" --cors-configuration "file://${CORS_FILE}" 2>/dev/null || true
+rm -f "$CORS_FILE"
+
+echo "2c) Ensuring log group exists: ${LOG_GROUP}"
 if ! aws logs describe-log-groups \
   --region "$REGION" \
   --log-group-name-prefix "$LOG_GROUP" \
