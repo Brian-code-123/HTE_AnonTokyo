@@ -87,6 +87,24 @@ class BodyLanguageSummary(BaseModel):
     combined_report: str
 
 
+class KnowledgePointAnalysis(BaseModel):
+    topic: str
+    timestamp_start: float
+    timestamp_end: float
+    transcript_excerpt: str
+    content_analysis: str
+    content_score: int
+    presentation_analysis: str
+    presentation_score: int
+    suggestions: list[str]
+
+
+class KnowledgePointReport(BaseModel):
+    points: list[KnowledgePointAnalysis]
+    avg_content_score: float
+    avg_presentation_score: float
+
+
 class FullAnalysisResponse(BaseModel):
     status: str = "success"
     job_id: str
@@ -95,6 +113,8 @@ class FullAnalysisResponse(BaseModel):
     transcript: TranscriptResult | None = None
     body_language: BodyLanguageSummary | None = None
     rubric_evaluation: str | None = None
+    fluctuation_timeline: list[FluctuationWindow] | None = None
+    knowledge_points: KnowledgePointReport | None = None
 
 
 # ── Dashboard ────────────────────────────────────────────────────────────────

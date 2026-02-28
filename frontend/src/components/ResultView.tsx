@@ -1,13 +1,12 @@
 /**
  * Result View Component
- * 
+ *
  * Displays transcription results with multiple view modes:
  * - Full transcript text view
  * - Timestamped segments with timeline
  * - SRT subtitle format preview
+ * - AI Feedback (on-demand generation from transcript)
  * - Download options for each format
- * - Metadata: duration, language, word count
- * - Reset button to start new transcription
  */
 import { useState } from 'react'
 import {
@@ -19,8 +18,11 @@ import {
   CheckCircle,
   AlignLeft,
   List,
+  MessageSquare,
+  Loader2,
 } from 'lucide-react'
 import type { TranscriptResult } from '../types'
+import { generateFeedback } from '../services/api'
 
 interface ResultViewProps {
   /** Complete transcription result from API */
@@ -30,7 +32,7 @@ interface ResultViewProps {
 }
 
 /** Available views for displaying transcription results */
-type ViewTab = 'text' | 'segments' | 'srt'
+type ViewTab = 'text' | 'segments' | 'srt' | 'feedback'
 
 /**
  * Format duration in seconds to human-readable format (e.g., "2m 45s")
@@ -70,11 +72,29 @@ function downloadBlob(content: string, filename: string, mime: string) {
 }
 
 export default function ResultView({ result, onReset }: ResultViewProps) {
-  /** Currently active result view tab */
   const [activeTab, setActiveTab] = useState<ViewTab>('text')
+  const [feedback, setFeedback] = useState<string | null>(null)
+  const [feedbackModel, setFeedbackModel] = useState<string | null>(null)
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [feedbackError, setFeedbackError] = useState<string | null>(null)
 
-  /** Calculate word count for display in metadata */
   const wordCount = result.full_text.trim().split(/\s+/).filter(Boolean).length
+
+  async function handleGenerateFeedback() {
+    setFeedbackLoading(true)
+    setFeedbackError(null)
+    try {
+      const res = await generateFeedback({
+        transcript: result.full_text,
+      })
+      setFeedback(res.feedback)
+      setFeedbackModel(res.model)
+    } catch (err) {
+      setFeedbackError(err instanceof Error ? err.message : 'Failed to generate feedback')
+    } finally {
+      setFeedbackLoading(false)
+    }
+  }
 
   return (
     <div className="glass-card result-section">
@@ -123,6 +143,15 @@ export default function ResultView({ result, onReset }: ResultViewProps) {
             <FileText size={13} /> SRT Preview
           </span>
         </button>
+        <button
+          className={`view-tab ${activeTab === 'feedback' ? 'active' : ''}`}
+          onClick={() => setActiveTab('feedback')}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+            <MessageSquare size={13} /> AI Feedback
+            {feedback && <CheckCircle size={11} style={{ color: 'var(--accent-primary)' }} />}
+          </span>
+        </button>
       </div>
 
       {/* Text view */}
@@ -152,6 +181,54 @@ export default function ResultView({ result, onReset }: ResultViewProps) {
         </div>
       )}
 
+      {/* AI Feedback view */}
+      {activeTab === 'feedback' && (
+        <div className="feedback-panel" style={{ padding: '1rem 0' }}>
+          {!feedback && !feedbackLoading && (
+            <div className="feedback-prompt">
+              <p className="feedback-prompt-text">
+                Generate AI feedback on the transcript — teaching quality, clarity, and suggestions for improvement.
+              </p>
+              <button
+                className="btn-generate-feedback"
+                onClick={handleGenerateFeedback}
+                disabled={feedbackLoading}
+              >
+                <MessageSquare size={16} />
+                Generate AI Feedback
+              </button>
+            </div>
+          )}
+          {feedbackLoading && (
+            <div className="feedback-loading">
+              <Loader2 size={24} className="spinner" />
+              <p>Generating feedback&hellip;</p>
+              <p className="feedback-loading-sub">This may take a minute.</p>
+            </div>
+          )}
+          {feedbackError && (
+            <div className="feedback-error">
+              <p>{feedbackError}</p>
+              <button className="btn-generate-feedback" onClick={handleGenerateFeedback}>
+                Retry
+              </button>
+            </div>
+          )}
+          {feedback && (
+            <>
+              {feedbackModel && (
+                <div className="feedback-meta" style={{ marginBottom: '0.5rem' }}>
+                  <span className="meta-chip">{feedbackModel}</span>
+                </div>
+              )}
+              <div className="transcript-box" style={{ maxHeight: '500px', whiteSpace: 'pre-wrap' }}>
+                {feedback}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Download buttons */}
       <div className="download-row">
         <button
@@ -166,6 +243,14 @@ export default function ResultView({ result, onReset }: ResultViewProps) {
         >
           <Download /> Download .srt
         </button>
+        {feedback && (
+          <button
+            className="btn-download"
+            onClick={() => downloadBlob(feedback, 'ai_feedback.md', 'text/markdown')}
+          >
+            <Download /> Feedback .md
+          </button>
+        )}
         <button
           className="btn-download"
           onClick={() =>

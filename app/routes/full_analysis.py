@@ -21,8 +21,10 @@ from app.config import get_settings
 from app.schemas.response import (
     BodyLanguageSegmentReport,
     BodyLanguageSummary,
+    FluctuationWindow,
     FullAnalysisRequest,
     FullAnalysisResponse,
+    KnowledgePointReport,
     SegmentResult,
     TranscriptResult,
     TranscriptSegment,
@@ -35,6 +37,7 @@ from app.services.gemini_body_language import (
     upload_video_to_gemini,
 )
 from app.services.gemini_evaluation import evaluate_with_gemini
+from app.services.knowledge_point_analysis import analyze_knowledge_points
 from app.services.placeholder_data import (
     PLACEHOLDER_RUBRIC_EVALUATION,
     PLACEHOLDER_VIDEO_SOURCE,
@@ -42,6 +45,7 @@ from app.services.placeholder_data import (
 )
 from app.services.session_stats import stats as session_stats
 from app.services.elevenlabs_transcribe import ElevenLabsTranscribeService
+from app.services.voice_analysis import calculate_fluctuation_timeline
 from app.services.youtube_service import YouTubeDownloader, is_valid_youtube_url
 
 logger = logging.getLogger(__name__)
@@ -162,16 +166,24 @@ async def full_analysis_file(
 
         loop = asyncio.get_running_loop()
 
-        # Step 1: Extract audio + transcribe
+        # Step 1: Extract audio, then transcribe + voice fluctuation in parallel
         await loop.run_in_executor(None, extract_audio, raw_path, wav_path)
         logger.info("[%s] Audio extracted", job_id)
 
         if not settings.elevenlabs_api_key:
             raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured.")
         svc = ElevenLabsTranscribeService(settings.elevenlabs_api_key, settings.elevenlabs_stt_model)
-        ws_result = await loop.run_in_executor(None, svc.transcribe, wav_path, language)
+
+        transcript_future = loop.run_in_executor(None, svc.transcribe, wav_path, language)
+        fluctuation_future = loop.run_in_executor(
+            None, calculate_fluctuation_timeline, wav_path, settings.fluctuation_window_seconds,
+        )
+        ws_result, fluctuation_raw = await asyncio.gather(transcript_future, fluctuation_future)
+
         transcript_result = _build_transcript_result(ws_result, job_id)
+        fluctuation_timeline = [FluctuationWindow(**w) for w in fluctuation_raw]
         logger.info("[%s] Transcription done: %d segments", job_id, len(ws_result.segments))
+        logger.info("[%s] Voice fluctuation done: %d windows", job_id, len(fluctuation_timeline))
 
         # Step 2: Body language analysis (only for video files)
         body_language: BodyLanguageSummary | None = None
@@ -204,6 +216,22 @@ async def full_analysis_file(
         else:
             rubric_evaluation = PLACEHOLDER_RUBRIC_EVALUATION
             logger.info("[%s] Rubric: using fallback from body_language_analysis/", job_id)
+
+        # Step 4: Knowledge point analysis (Gemini or skip)
+        knowledge_points: KnowledgePointReport | None = None
+        if use_gemini:
+            try:
+                kp_raw = await loop.run_in_executor(
+                    None,
+                    analyze_knowledge_points,
+                    api_key, model, ws_result.full_text,
+                    bl_report, fluctuation_raw,
+                )
+                knowledge_points = KnowledgePointReport(**kp_raw)
+                logger.info("[%s] Knowledge point analysis done: %d points", job_id, len(knowledge_points.points))
+            except Exception as exc:
+                logger.warning("[%s] Knowledge point analysis failed (non-fatal): %s", job_id, exc)
+
         session_stats.full_analyses += 1
         return FullAnalysisResponse(
             job_id=job_id,
@@ -212,6 +240,8 @@ async def full_analysis_file(
             transcript=transcript_result,
             body_language=body_language,
             rubric_evaluation=rubric_evaluation,
+            fluctuation_timeline=fluctuation_timeline,
+            knowledge_points=knowledge_points,
         )
 
     except HTTPException:
@@ -281,15 +311,23 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
         )
         logger.info("[%s] YouTube audio ready: %s", job_id, wav_path)
 
-        # Step 1: Transcribe
+        # Step 1: Transcribe + voice fluctuation in parallel
         if not settings.elevenlabs_api_key:
             raise HTTPException(status_code=500, detail="ELEVENLABS_API_KEY not configured.")
         svc = ElevenLabsTranscribeService(settings.elevenlabs_api_key, settings.elevenlabs_stt_model)
-        ws_result = await loop.run_in_executor(
+
+        transcript_future = loop.run_in_executor(
             None, svc.transcribe, wav_path, body.language,
         )
+        fluctuation_future = loop.run_in_executor(
+            None, calculate_fluctuation_timeline, wav_path, settings.fluctuation_window_seconds,
+        )
+        ws_result, fluctuation_raw = await asyncio.gather(transcript_future, fluctuation_future)
+
         transcript_result = _build_transcript_result(ws_result, job_id)
+        fluctuation_timeline = [FluctuationWindow(**w) for w in fluctuation_raw]
         logger.info("[%s] Transcription done: %d segments", job_id, len(ws_result.segments))
+        logger.info("[%s] Voice fluctuation done: %d windows", job_id, len(fluctuation_timeline))
 
         # Step 2: Body language analysis
         if use_gemini:
@@ -309,16 +347,33 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
             logger.info("[%s] Body language: using fallback from body_language_analysis/", job_id)
 
         # Step 3: Rubric evaluation (Gemini or fallback)
+        bl_report = body_language.combined_report if body_language else None
         if use_gemini:
             rubric_evaluation = await loop.run_in_executor(
                 None,
                 evaluate_with_gemini,
-                api_key, model, ws_result.full_text, body_language.combined_report,
+                api_key, model, ws_result.full_text, bl_report,
             )
             logger.info("[%s] Rubric evaluation done", job_id)
         else:
             rubric_evaluation = PLACEHOLDER_RUBRIC_EVALUATION
             logger.info("[%s] Rubric: using fallback from body_language_analysis/", job_id)
+
+        # Step 4: Knowledge point analysis (Gemini or skip)
+        knowledge_points: KnowledgePointReport | None = None
+        if use_gemini:
+            try:
+                kp_raw = await loop.run_in_executor(
+                    None,
+                    analyze_knowledge_points,
+                    api_key, model, ws_result.full_text,
+                    bl_report, fluctuation_raw,
+                )
+                knowledge_points = KnowledgePointReport(**kp_raw)
+                logger.info("[%s] Knowledge point analysis done: %d points", job_id, len(knowledge_points.points))
+            except Exception as exc:
+                logger.warning("[%s] Knowledge point analysis failed (non-fatal): %s", job_id, exc)
+
         session_stats.full_analyses += 1
         return FullAnalysisResponse(
             job_id=job_id,
@@ -327,6 +382,8 @@ async def full_analysis_youtube(body: FullAnalysisRequest) -> FullAnalysisRespon
             transcript=transcript_result,
             body_language=body_language,
             rubric_evaluation=rubric_evaluation,
+            fluctuation_timeline=fluctuation_timeline,
+            knowledge_points=knowledge_points,
         )
 
     except HTTPException:

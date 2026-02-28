@@ -11,16 +11,19 @@ import {
   Info,
   MessageSquare,
   Loader2,
+  Target,
 } from 'lucide-react'
 import type { FullAnalysisResult } from '../types'
 import { generateFeedback } from '../services/api'
+import FluctuationChart from './FluctuationChart'
+import KnowledgePointsView from './KnowledgePointsView'
 
 interface Props {
   result: FullAnalysisResult
   onReset: () => void
 }
 
-type ActiveTab = 'body-language' | 'rubric' | 'transcript' | 'feedback'
+type ActiveTab = 'body-language' | 'rubric' | 'knowledge-points' | 'transcript' | 'feedback'
 
 function downloadBlob(content: string, filename: string, mime: string) {
   const blob = new Blob([content], { type: mime })
@@ -82,6 +85,10 @@ export default function AnalysisResultView({ result, onReset }: Props) {
         </div>
       </div>
 
+      {result.fluctuation_timeline && result.fluctuation_timeline.length > 0 && (
+        <FluctuationChart timeline={result.fluctuation_timeline} />
+      )}
+
       <div className="view-tabs">
         <button
           className={`view-tab ${activeTab === 'body-language' ? 'active' : ''}`}
@@ -99,6 +106,16 @@ export default function AnalysisResultView({ result, onReset }: Props) {
             <BookOpen size={13} /> Rubric Evaluation
           </span>
         </button>
+        {result.knowledge_points && (
+          <button
+            className={`view-tab ${activeTab === 'knowledge-points' ? 'active' : ''}`}
+            onClick={() => setActiveTab('knowledge-points')}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Target size={13} /> Knowledge Points
+            </span>
+          </button>
+        )}
         {result.transcript && (
           <button
             className={`view-tab ${activeTab === 'transcript' ? 'active' : ''}`}
@@ -158,6 +175,10 @@ export default function AnalysisResultView({ result, onReset }: Props) {
         <div className="transcript-box" style={{ maxHeight: '500px' }}>
           {result.rubric_evaluation ?? 'No rubric evaluation available.'}
         </div>
+      )}
+
+      {activeTab === 'knowledge-points' && result.knowledge_points && (
+        <KnowledgePointsView report={result.knowledge_points} />
       )}
 
       {activeTab === 'transcript' && result.transcript && (

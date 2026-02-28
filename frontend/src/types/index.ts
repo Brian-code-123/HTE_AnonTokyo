@@ -124,12 +124,41 @@ export interface BodyLanguageReport {
   model: string
 }
 
-/** Combined full analysis result (body language + rubric + transcript) */
+/** Voice fluctuation measurement for a time window */
+export interface FluctuationWindow {
+  timestamp_start: number
+  timestamp_end: number
+  fluctuation_score: number
+}
+
+/** Per-knowledge-point analysis from LLM */
+export interface KnowledgePointAnalysis {
+  topic: string
+  timestamp_start: number
+  timestamp_end: number
+  transcript_excerpt: string
+  content_analysis: string
+  content_score: number
+  presentation_analysis: string
+  presentation_score: number
+  suggestions: string[]
+}
+
+/** Knowledge point report with averages */
+export interface KnowledgePointReport {
+  points: KnowledgePointAnalysis[]
+  avg_content_score: number
+  avg_presentation_score: number
+}
+
+/** Combined full analysis result (body language + rubric + transcript + fluctuation + knowledge points) */
 export interface FullAnalysisResult {
   is_placeholder: boolean
   transcript?: TranscriptResult
   body_language?: BodyLanguageReport
   rubric_evaluation?: string
+  fluctuation_timeline?: FluctuationWindow[]
+  knowledge_points?: KnowledgePointReport
 }
 
 /** Options for file-based full analysis */
