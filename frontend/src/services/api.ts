@@ -11,7 +11,7 @@
  * - POST /api/analyze/youtube - YouTube URL transcription
  */
 import axios, { AxiosError } from 'axios'
-import type { TranscriptResult, TTSResult, TTSVoice, VideoGenResult, FullAnalysisResult, FullAnalysisFileOptions, FullAnalysisYoutubeOptions, FeedbackRequest, FeedbackResult, DashboardData } from '../types'
+import type { TranscriptResult, TTSResult, TTSVoice, VideoGenResult, FullAnalysisResult, FullAnalysisFileOptions, FullAnalysisYoutubeOptions, FeedbackRequest, FeedbackResult, DashboardData, HistoryData } from '../types'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
@@ -204,6 +204,20 @@ export async function fullAnalysisYoutube({
 export async function fetchDashboard(): Promise<DashboardData> {
   try {
     const { data } = await api.get<DashboardData>('/dashboard')
+    return data
+  } catch (err) {
+    throw new Error(extractError(err))
+  }
+}
+
+export async function fetchHistory(limit = 50, eventType?: string): Promise<HistoryData> {
+  try {
+    const { data } = await api.get<HistoryData>('/history', {
+      params: {
+        limit,
+        event_type: eventType || undefined,
+      },
+    })
     return data
   } catch (err) {
     throw new Error(extractError(err))

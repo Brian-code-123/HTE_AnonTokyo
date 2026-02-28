@@ -4,14 +4,16 @@ session-level activity counters, and capability flags.
 
   GET /api/dashboard
 """
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.config import get_settings
 from app.schemas.response import (
     DashboardResponse,
     DashboardStats,
+    HistoryResponse,
     ServiceStatus,
 )
+from app.services.persistence import list_events
 from app.services.session_stats import stats as session_stats
 
 APP_VERSION = "0.2.0"
@@ -63,3 +65,12 @@ def get_dashboard() -> DashboardResponse:
         ),
         capabilities=capabilities,
     )
+
+
+@router.get("/api/history", response_model=HistoryResponse)
+def get_history(
+    limit: int = Query(default=50, ge=1, le=500),
+    event_type: str | None = Query(default=None),
+) -> HistoryResponse:
+    events = list_events(limit=limit, event_type=event_type)
+    return HistoryResponse(total=len(events), events=events)

@@ -199,6 +199,22 @@ export interface DashboardData {
   capabilities: string[]
 }
 
+export interface HistoryEvent {
+  id: number
+  event_type: string
+  status: string
+  job_id?: string | null
+  source?: string | null
+  payload: Record<string, unknown>
+  created_at: string
+}
+
+export interface HistoryData {
+  status: string
+  total: number
+  events: HistoryEvent[]
+}
+
 // ── LLM Feedback Types ──────────────────────────────────────────────────
 
 /** Feedback generation request */

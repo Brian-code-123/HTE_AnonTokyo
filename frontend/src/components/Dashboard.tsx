@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import {
   CheckCircle2,
   XCircle,
@@ -14,9 +14,12 @@ import {
   Eye,
   Sparkles,
   ChevronRight,
+  Database,
+  Filter,
+  Hash,
 } from 'lucide-react'
-import type { DashboardData } from '../types'
-import { fetchDashboard } from '../services/api'
+import type { DashboardData, HistoryData, HistoryEvent } from '../types'
+import { fetchDashboard, fetchHistory } from '../services/api'
 
 interface Props {
   onNavigate: (tab: string) => void
@@ -39,6 +42,10 @@ const CAPABILITY_META: Record<string, { icon: typeof Mic; label: string; tab: st
 
 export default function Dashboard({ onNavigate }: Props) {
   const [data, setData] = useState<DashboardData | null>(null)
+  const [history, setHistory] = useState<HistoryData | null>(null)
+  const [historyError, setHistoryError] = useState<string | null>(null)
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null)
+  const [eventTypeFilter, setEventTypeFilter] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date())
@@ -46,16 +53,24 @@ export default function Dashboard({ onNavigate }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
+    setHistoryError(null)
     try {
-      const d = await fetchDashboard()
+      const [d, h] = await Promise.all([
+        fetchDashboard(),
+        fetchHistory(100, eventTypeFilter || undefined),
+      ])
       setData(d)
+      setHistory(h)
+      setSelectedEventId(prev => prev ?? (h.events[0]?.id ?? null))
       setLastRefresh(new Date())
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard')
+      const msg = err instanceof Error ? err.message : 'Failed to load dashboard'
+      setError(msg)
+      setHistoryError(msg)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [eventTypeFilter])
 
   useEffect(() => {
     load()
@@ -65,6 +80,47 @@ export default function Dashboard({ onNavigate }: Props) {
 
   const configuredCount = data?.services.filter(s => s.configured).length ?? 0
   const totalServices = data?.services.length ?? 0
+  const selectedEvent = useMemo<HistoryEvent | null>(() => {
+    if (!history?.events?.length) return null
+    return history.events.find(e => e.id === selectedEventId) ?? history.events[0]
+  }, [history, selectedEventId])
+  const eventTypeOptions = useMemo(() => {
+    if (!history?.events?.length) return []
+    return Array.from(new Set(history.events.map(e => e.event_type))).sort()
+  }, [history])
+
+  function renderValue(value: unknown): JSX.Element {
+    if (value === null || value === undefined) return <span style={{ opacity: 0.7 }}>null</span>
+    if (typeof value === 'string') return <span>{value}</span>
+    if (typeof value === 'number' || typeof value === 'boolean') return <span>{String(value)}</span>
+    if (Array.isArray(value)) {
+      if (value.length === 0) return <span>[]</span>
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          {value.map((item, idx) => (
+            <div key={idx} style={{ paddingLeft: '0.75rem', borderLeft: '2px solid var(--border-color)' }}>
+              {renderValue(item)}
+            </div>
+          ))}
+        </div>
+      )
+    }
+    if (typeof value === 'object') {
+      const entries = Object.entries(value as Record<string, unknown>)
+      if (entries.length === 0) return <span>{'{}'}</span>
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+          {entries.map(([k, v]) => (
+            <div key={k} style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: '0.5rem' }}>
+              <span style={{ fontFamily: 'monospace', color: 'var(--text-muted)' }}>{k}</span>
+              <div>{renderValue(v)}</div>
+            </div>
+          ))}
+        </div>
+      )
+    }
+    return <span>{String(value)}</span>
+  }
 
   return (
     <div className="dashboard">
@@ -231,6 +287,99 @@ export default function Dashboard({ onNavigate }: Props) {
                 }
                 <ChevronRight size={14} style={{ marginLeft: 'auto' }} />
               </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="db-two-col" style={{ marginTop: '1rem' }}>
+        <div className="glass-card db-panel">
+          <h3 className="db-panel-title">
+            <Database size={16} /> Previous Generations & Analytics
+            <span className="db-service-summary all-ok">{history?.total ?? 0} records</span>
+          </h3>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', alignItems: 'center' }}>
+            <Filter size={14} style={{ opacity: 0.7 }} />
+            <select
+              className="select-input"
+              value={eventTypeFilter}
+              onChange={e => setEventTypeFilter(e.target.value)}
+              style={{ maxWidth: '240px' }}
+            >
+              <option value="">All event types</option>
+              {eventTypeOptions.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          </div>
+
+          {historyError && (
+            <div className="db-error">
+              <XCircle size={14} /> {historyError}
+            </div>
+          )}
+
+          <div className="db-service-list" style={{ maxHeight: '360px', overflow: 'auto' }}>
+            {history?.events.map(evt => (
+              <button
+                key={evt.id}
+                className="db-service-item"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  background: evt.id === selectedEvent?.id ? 'rgba(99,102,241,0.12)' : 'transparent',
+                  border: '1px solid var(--border-color)',
+                  borderRadius: '0.6rem',
+                  marginBottom: '0.45rem',
+                  cursor: 'pointer',
+                }}
+                onClick={() => setSelectedEventId(evt.id)}
+              >
+                <span className="db-service-dot"><Hash size={14} /></span>
+                <span className="db-service-label">
+                  <strong>{evt.event_type}</strong>
+                  <span style={{ opacity: 0.7, marginLeft: '0.4rem' }}>#{evt.id}</span>
+                </span>
+                <span className={`db-service-badge ${evt.status === 'success' ? 'ok' : 'missing'}`}>
+                  {evt.status}
+                </span>
+              </button>
+            ))}
+            {!history?.events.length && !loading && (
+              <p className="db-empty">No saved generations yet.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="glass-card db-panel">
+          <h3 className="db-panel-title">
+            <Activity size={16} /> Full Data Display
+          </h3>
+
+          {!selectedEvent && (
+            <p className="db-empty">Select an event to view all analytics fields.</p>
+          )}
+
+          {selectedEvent && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div className="meta-chip">
+                <strong>{selectedEvent.event_type}</strong> &nbsp;#{selectedEvent.id}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '140px 1fr', gap: '0.5rem' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Created</span>
+                <span>{new Date(selectedEvent.created_at).toLocaleString()}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Status</span>
+                <span>{selectedEvent.status}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Job ID</span>
+                <span>{selectedEvent.job_id || '—'}</span>
+                <span style={{ color: 'var(--text-muted)' }}>Source</span>
+                <span>{selectedEvent.source || '—'}</span>
+              </div>
+
+              <div className="transcript-box" style={{ maxHeight: '360px' }}>
+                {renderValue(selectedEvent.payload)}
+              </div>
             </div>
           )}
         </div>

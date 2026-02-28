@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import BaseModel
 
 
@@ -137,6 +139,22 @@ class DashboardResponse(BaseModel):
     services: list[ServiceStatus]
     stats: DashboardStats
     capabilities: list[str]
+
+
+class HistoryEvent(BaseModel):
+    id: int
+    event_type: str
+    status: str
+    job_id: str | None = None
+    source: str | None = None
+    payload: dict[str, Any]
+    created_at: str
+
+
+class HistoryResponse(BaseModel):
+    status: str = "ok"
+    total: int
+    events: list[HistoryEvent]
 
 
 # ── LLM Feedback (Minimax) ───────────────────────────────────────────────────

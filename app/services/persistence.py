@@ -55,3 +55,44 @@ def save_event(
         conn.commit()
     finally:
         conn.close()
+
+
+def list_events(limit: int = 50, event_type: str | None = None) -> list[dict]:
+    db_path = get_settings().database_path
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        query = """
+            SELECT id, event_type, status, job_id, source, payload_json, created_at
+            FROM event_records
+        """
+        params: list[object] = []
+        if event_type:
+            query += " WHERE event_type = ?"
+            params.append(event_type)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(limit, 500)))
+
+        rows = conn.execute(query, params).fetchall()
+        events: list[dict] = []
+        for row in rows:
+            payload_raw = row["payload_json"] or "{}"
+            try:
+                payload = json.loads(payload_raw)
+            except json.JSONDecodeError:
+                payload = {"raw_payload": payload_raw}
+
+            events.append(
+                {
+                    "id": row["id"],
+                    "event_type": row["event_type"],
+                    "status": row["status"],
+                    "job_id": row["job_id"],
+                    "source": row["source"],
+                    "payload": payload,
+                    "created_at": row["created_at"],
+                }
+            )
+        return events
+    finally:
+        conn.close()
